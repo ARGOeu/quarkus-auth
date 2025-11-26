@@ -14,7 +14,7 @@ public class OIDCEntitlementService {
     @Inject
     TokenIntrospection tokenIntrospection;
 
-    @ConfigProperty(name = "api.status.pages.entitlements.namespace")
+    @ConfigProperty(name = "quarkus.auth.entitlements.namespace")
     String namespace;
 
     public List<Entitlement> fetchEntitlements() {
