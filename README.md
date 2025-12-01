@@ -46,8 +46,8 @@ The library must be configured to understand which entitlement namespace and par
 The following parameters must be set:
 
 ```
-quarkus.auth.entitlements.parent.group=parent-group-name
-quarkus.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
+api.auth.entitlements.parent.group=parent-group-name
+api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
 ```
 
 These settings define:
@@ -199,8 +199,8 @@ To allow the library to correctly filter and evaluate only the entitlements that
 
 ---
 ```properties
-quarkus.auth.entitlements.parent.group=parent-group-name
-quarkus.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
+api.auth.entitlements.parent.group=parent-group-name
+api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
 ```
 ---
 These parameters instruct the authorization library to inspect only the entitlements that match the configured namespace and the parent group hierarchy.

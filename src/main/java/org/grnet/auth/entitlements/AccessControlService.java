@@ -9,7 +9,7 @@ import java.util.List;
 @ApplicationScoped
 public class AccessControlService {
 
-    @ConfigProperty(name = "quarkus.auth.entitlements.parent.group")
+    @ConfigProperty(name = "api.auth.entitlements.parent.group")
     String parentGroup;
 
     @Inject
