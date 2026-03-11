@@ -2,13 +2,10 @@ package org.grnet.endpoint.scanner.runtime.database;
 
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.arc.Arc;
-import io.quarkus.arc.InjectableInstance;
 import io.quarkus.datasource.common.runtime.DatabaseKind;
-import jakarta.enterprise.inject.Instance;
 import org.apache.ibatis.jdbc.ScriptRunner;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
-import org.jboss.logging.Logger;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +17,10 @@ import java.sql.SQLException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import org.jboss.logging.Logger;
+
+import static io.quarkus.arc.ComponentsProvider.LOG;
+
 
 public class SchemaInitializer {
 
@@ -41,6 +42,7 @@ public class SchemaInitializer {
                 """;*/
 
                 //String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
+
 
                 LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
 
@@ -65,45 +67,6 @@ public class SchemaInitializer {
         } else {
             LOG.info("No JDBC data source found...");
             throw new RuntimeException("No JDBC data source found...");
-        }
-    }
-
-    private void insertEndpoints(Connection conn, List<EndpointMetadata> endpoints, String insertSql, String checkSql) throws SQLException {
-
-        conn.setAutoCommit(false);
-
-        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql);
-             PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
-
-            for (EndpointMetadata endpoint : endpoints) {
-
-                String securedEndpointId = generateSecuredEndpointId(endpoint);
-
-                checkStmt.setString(1, securedEndpointId);
-                try (var rs = checkStmt.executeQuery()) {
-                    if (rs.next() && rs.getInt(1) > 0) {
-                        LOG.info(String.format("Endpoint already exists, skipping: %s", securedEndpointId));
-                        continue;
-                    }
-                }
-
-                insertStmt.setString(1, securedEndpointId);
-                //insertStmt.setString(2, endpoint.getResource());
-                insertStmt.setString(3, endpoint.getAction());
-                insertStmt.setString(4, endpoint.getPath());
-                insertStmt.setString(5, endpoint.getDescription());
-                insertStmt.executeUpdate();
-            }
-
-            conn.commit();
-            LOG.info("Endpoints inserted successfully.");
-
-        } catch (SQLException e) {
-            conn.rollback();
-            LOG.error("Failed to insert endpoints, transaction rolled back.", e);
-            throw new RuntimeException("Failed to insert endpoints", e);
-        } finally {
-            conn.setAutoCommit(true);
         }
     }
 

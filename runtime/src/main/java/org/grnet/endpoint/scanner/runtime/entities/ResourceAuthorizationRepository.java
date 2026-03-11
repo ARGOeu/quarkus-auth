@@ -4,5 +4,8 @@ import java.util.List;
 
 public interface ResourceAuthorizationRepository {
 
-    List<?> findAll();
+    List<ResourceAuthorization> findAll();
+    List<ResourceAuthorization> list(String column, String value);
+    void  create(ResourceAuthorization entity);
+
 }

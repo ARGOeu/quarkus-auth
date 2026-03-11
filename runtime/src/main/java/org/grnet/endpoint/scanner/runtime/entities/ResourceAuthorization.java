@@ -1,34 +1,40 @@
 package org.grnet.endpoint.scanner.runtime.entities;
 
-import java.sql.Time;
+import java.sql.Timestamp;
 
 public class ResourceAuthorization {
 
     private Long id;
 
-    private String name;
+    private String rule;
 
-    private Time createdAt;
+    private String securedEndpointId;
+    private Timestamp createdAt;
 
-    public ResourceAuthorization(Long id, String name, Time createdAt) {
+    public ResourceAuthorization(Long id, String securedEndpointId,String rule, Timestamp createdAt) {
         this.id = id;
-        this.name = name;
+        this.securedEndpointId=securedEndpointId;
+        this.rule = rule;
         this.createdAt = createdAt;
     }
 
-    public String getName() {
-        return name;
+    public ResourceAuthorization() {
+
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public String getRule() {
+        return rule;
     }
 
-    public Time getCreatedAt() {
+    public void setRule(String rule) {
+        this.rule = rule;
+    }
+
+    public Timestamp getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Time createdAt) {
+    public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -38,5 +44,13 @@ public class ResourceAuthorization {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getSecuredEndpointId() {
+        return securedEndpointId;
+    }
+
+    public void setSecuredEndpointId(String securedEndpointId) {
+        this.securedEndpointId = securedEndpointId;
     }
 }

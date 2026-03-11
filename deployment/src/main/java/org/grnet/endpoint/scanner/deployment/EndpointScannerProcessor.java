@@ -1,13 +1,7 @@
 package org.grnet.endpoint.scanner.deployment;
 
 import io.quarkus.agroal.spi.JdbcDataSourceBuildItem;
-import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
-import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
-import io.quarkus.arc.deployment.BeanContainerBuildItem;
-import io.quarkus.arc.deployment.BeanContainerListenerBuildItem;
-import io.quarkus.arc.deployment.InterceptorBindingRegistrarBuildItem;
-import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
-import io.quarkus.arc.deployment.SyntheticBeansRuntimeInitBuildItem;
+import io.quarkus.arc.deployment.*;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.Consume;
@@ -15,6 +9,7 @@ import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Produce;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
+import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
 import io.quarkus.undertow.deployment.ServletBuildItem;
@@ -23,8 +18,10 @@ import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
 import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.EndpointResolverJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.EndpointResolverMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Actor;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.ActorEntitlements;
@@ -43,11 +40,18 @@ import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementService;
 import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.OidcEntitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.PersistenceEntitlement;
+
+import org.grnet.endpoint.scanner.runtime.entities.*;
+import org.grnet.endpoint.scanner.runtime.resolvers.DynamicResolver;
+import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
+import org.grnet.endpoint.scanner.runtime.resolvers.RepositoryRegistry;
+import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
+import org.grnet.endpoint.scanner.runtime.services.ResolverConfigService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
-import org.grnet.endpoint.scanner.runtime.endpoints.MyExtensionResource;
+import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassType;
@@ -72,11 +76,11 @@ class EndpointScannerProcessor {
     private static final String FEATURE = "endpoint-scanner";
 
     private static final Map<DotName, String> HTTP_METHOD_NAMES = Map.of(
-            DotName.createSimple("jakarta.ws.rs.GET"),    "GET",
-            DotName.createSimple("jakarta.ws.rs.POST"),   "POST",
-            DotName.createSimple("jakarta.ws.rs.PUT"),    "PUT",
+            DotName.createSimple("jakarta.ws.rs.GET"), "GET",
+            DotName.createSimple("jakarta.ws.rs.POST"), "POST",
+            DotName.createSimple("jakarta.ws.rs.PUT"), "PUT",
             DotName.createSimple("jakarta.ws.rs.DELETE"), "DELETE",
-            DotName.createSimple("jakarta.ws.rs.PATCH"),  "PATCH"
+            DotName.createSimple("jakarta.ws.rs.PATCH"), "PATCH"
     );
 
     private static final DotName PATH = DotName.createSimple("jakarta.ws.rs.Path");
@@ -87,7 +91,7 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    EndpointMetadataBuildItem scan(BeanArchiveIndexBuildItem indexBuildItem) {
+    EndpointMetadataBuildItem scan(CombinedIndexBuildItem indexBuildItem) {
 
         // Quarkus provides the index automatically
         var index = indexBuildItem.getIndex();
@@ -202,8 +206,8 @@ class EndpointScannerProcessor {
     @BuildStep
     void registerResource(BuildProducer<AdditionalIndexedClassesBuildItem> additionalIndexedClasses, BuildProducer<AdditionalBeanBuildItem> additionalBeans) {
 
-        additionalBeans.produce(new AdditionalBeanBuildItem(MyExtensionResource.class));
-        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(MyExtensionResource.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(SecuredEndpointResource.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationMongo.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
@@ -216,7 +220,7 @@ class EndpointScannerProcessor {
 
         registrars.produce(new InterceptorBindingRegistrarBuildItem(new AuthorizationAnnotationsRegistrar()));
 
-        Class<?>[] interceptors = { SecuredEndpointInterceptor.class };
+        Class<?>[] interceptors = {SecuredEndpointInterceptor.class};
         beans.produce(new AdditionalBeanBuildItem(interceptors));
     }
 
@@ -225,9 +229,17 @@ class EndpointScannerProcessor {
 
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
+                AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
+
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
-                AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class)
-        );
+                AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
+                AdditionalBeanBuildItem.unremovableOf(RepositoryRegistry.class),
+                AdditionalBeanBuildItem.unremovableOf(DynamicResolver.class),
+                AdditionalBeanBuildItem.unremovableOf(ResolverConfigService.class),
+                AdditionalBeanBuildItem.unremovableOf(GroupIdResolver.class),
+                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
+                AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class),
+                AdditionalBeanBuildItem.unremovableOf(EndpointResolver.class));
     }
 
     @BuildStep
@@ -257,7 +269,7 @@ class EndpointScannerProcessor {
                 .addInjectionPoint(ClassType.create(DotName.createSimple(TokenIntrospection.class.getName())))
                 .createWith(recorder.createOidcEntitlementService());
 
-        if(jdbcDataSourceBuildItems.isEmpty()){
+        if (jdbcDataSourceBuildItems.isEmpty()) {
 
             var persistenceEntitlementService = SyntheticBeanBuildItem
                     .configure(EntitlementService.class)
@@ -277,6 +289,24 @@ class EndpointScannerProcessor {
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
         syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
     }
+//
+//    @BuildStep
+//    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+//
+//        Class<?> implementation;
+//
+//        if (!jdbcDataSourceBuildItems.isEmpty()) {
+//            implementation = ResourceAuthorizationJdbcRepository.class;
+//        } else {
+//            implementation = ResourceAuthorizationMongoRepository.class;
+//        }
+//
+//        return AdditionalBeanBuildItem
+//                .builder()
+//                .addBeanClass(implementation)
+//                .setUnremovable()
+//                .build();
+//    }
 
     @BuildStep
     List<AdditionalBeanBuildItem> selectBeans(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
@@ -284,15 +314,20 @@ class EndpointScannerProcessor {
         Class<?> resourceAuthorizationImplementation;
         Class<?> persistenceEntitlementImplementation;
         Class<?> entitlementProviderImplementation;
+        Class<?> endpointResolverImplementation;
 
         if (!jdbcDataSourceBuildItems.isEmpty()) {
             resourceAuthorizationImplementation = ResourceAuthorizationJdbcRepository.class;
             persistenceEntitlementImplementation = PersistenceEntitlementJDBCRepository.class;
             entitlementProviderImplementation = EntitlementProviderWithoutPersistence.class;
+            endpointResolverImplementation = EndpointResolverJdbcRepository.class;
+
         } else {
+
             resourceAuthorizationImplementation = ResourceAuthorizationMongoRepository.class;
             persistenceEntitlementImplementation = PersistenceEntitlementMongoRepository.class;
             entitlementProviderImplementation = EntitlementProviderWithPersistence.class;
+            endpointResolverImplementation = EndpointResolverMongoRepository.class;
         }
 
         return List.of(AdditionalBeanBuildItem
@@ -301,13 +336,19 @@ class EndpointScannerProcessor {
                 .setUnremovable()
                 .build(), AdditionalBeanBuildItem
                 .builder()
+                .addBeanClass(endpointResolverImplementation)
+                .setUnremovable()
+                .build(), AdditionalBeanBuildItem
+                .builder()
+
                 .addBeanClass(persistenceEntitlementImplementation)
                 .setUnremovable()
                 .build(), AdditionalBeanBuildItem
                 .builder()
                 .addBeanClass(entitlementProviderImplementation)
                 .setUnremovable()
-                .build());
+                .build()
+        );
     }
 
     @BuildStep(onlyIf = IsMongoPresent.class)
@@ -333,6 +374,26 @@ class EndpointScannerProcessor {
         }
     }
 
+    AdditionalBeanBuildItem selectRepositories(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+
+        boolean useJdbc = !jdbcDataSourceBuildItems.isEmpty();
+
+        AdditionalBeanBuildItem.Builder builder = AdditionalBeanBuildItem.builder()
+                .setUnremovable();
+
+        if (useJdbc) {
+            builder
+                    .addBeanClass(ResourceAuthorizationJdbcRepository.class)
+                    .addBeanClass(EndpointResolverJdbcRepository.class);
+        } else {
+            builder
+                    .addBeanClass(ResourceAuthorizationMongoRepository.class);
+            // .addBeanClass(EndpointResolverMongoRepository.class);
+        }
+
+        return builder.build();
+    }
+
     @BuildStep
     @Consume(BeanContainerBuildItem.class)
     @Record(ExecutionTime.RUNTIME_INIT)
@@ -342,8 +403,9 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    @Record(ExecutionTime.STATIC_INIT)  // or RUNTIME_INIT
-    SecuredEndpointMetadataBuildItem processAndRecord(EndpointRecorder recorder, BeanArchiveIndexBuildItem indexBuildItem) {
+    @Record(ExecutionTime.STATIC_INIT)
+        // or RUNTIME_INIT
+    SecuredEndpointMetadataBuildItem processAndRecord(EndpointRecorder recorder, CombinedIndexBuildItem indexBuildItem) {
 
         var builder = scan(indexBuildItem);
 
@@ -361,6 +423,62 @@ class EndpointScannerProcessor {
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
     }
 
+    //    @BuildStep
+//    void registerEntities(BuildProducer<AdditionalJpaModelBuildItem> jpaModel, BuildProducer<PanacheEntityClassBuildItem> panacheEntities, CombinedIndexBuildItem index) {
+//
+//        var entityClassInfo = index.getIndex()
+//                .getClassByName(DotName.createSimple(ResourceAuthorization.class.getName()));
+//
+//        jpaModel.produce(new AdditionalJpaModelBuildItem(ResourceAuthorization.class.getName()));
+//
+//        panacheEntities.produce(new PanacheEntityClassBuildItem(entityClassInfo));
+//
+//        var securedEndpointClassInfo = index.getIndex()
+//                .getClassByName(DotName.createSimple(SecuredEndpoint.class.getName()));
+//
+//        jpaModel.produce(new AdditionalJpaModelBuildItem(SecuredEndpoint.class.getName()));
+//
+//        panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));   panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
+//
+//        var endpointResolverClassInfo = index.getIndex()
+//                .getClassByName(DotName.createSimple(EndpointResolver.class.getName()));
+//
+//        jpaModel.produce(new AdditionalJpaModelBuildItem(EndpointResolver.class.getName()));
+//
+//        panacheEntities.produce(new PanacheEntityClassBuildItem(endpointResolverClassInfo));   panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
+//}
+//    @BuildStep
+//    void keepRepositories(BuildProducer<UnremovableBeanBuildItem> unremovableBeans,
+//                          CombinedIndexBuildItem index) {
+//
+//        var repoInterface = DotName.createSimple("io.quarkus.hibernate.orm.panache.PanacheRepositoryBase");
+//
+//        var repos = index.getIndex().getAllKnownImplementors(repoInterface);
+//
+//        for (var repo : repos) {
+//            unremovableBeans.produce(
+//                    UnremovableBeanBuildItem.beanClassNames(repo.name().toString())
+//            );
+//        }
+//    }
+
+    @BuildStep
+    void markResourceRepositoriesUnremovable(
+            CombinedIndexBuildItem index,
+            BuildProducer<UnremovableBeanBuildItem> unremovableBeans) {
+
+        // Use the annotation class directly (works across modules)
+        DotName annotation = DotName.createSimple(ResourceRepository.class.getName());
+
+        index.getIndex().getAnnotations(annotation).forEach(a -> {
+            var target = a.target();
+            if (target.kind() == AnnotationTarget.Kind.CLASS) {
+                String className = target.asClass().name().toString();
+                unremovableBeans.produce(UnremovableBeanBuildItem.beanClassNames(className));
+            }
+        });
+    }
+
     private Set<String> getDataSourceNames(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
         Set<String> result = new HashSet<>(jdbcDataSourceBuildItems.size());
         for (JdbcDataSourceBuildItem item : jdbcDataSourceBuildItems) {
@@ -368,4 +486,17 @@ class EndpointScannerProcessor {
         }
         return result;
     }
+
+//    @BuildStep
+//    void registerRepositories(CombinedIndexBuildItem combinedIndex,
+//                              BuildProducer<AdditionalBeanBuildItem> beans) {
+//
+//        var repoInterface = DotName.createSimple(
+//                "io.quarkus.hibernate.orm.panache.PanacheRepositoryBase"
+//        );
+//
+//        for (var repo : combinedIndex.getIndex().getAllKnownImplementors(repoInterface)) {
+//            beans.produce(AdditionalBeanBuildItem.unremovableOf(repo.name().toString()));
+//        }
+//    }
 }
