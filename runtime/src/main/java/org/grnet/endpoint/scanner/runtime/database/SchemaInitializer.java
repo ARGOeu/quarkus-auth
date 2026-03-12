@@ -27,16 +27,16 @@ public class SchemaInitializer {
         this.dataSource = dataSource;
     }
 
-    public void createTables(String dbKind, List<EndpointMetadata> endpoints) {
+    public void createTables(String dbKind) {
 
         if(DatabaseKind.isPostgreSQL(dbKind)){
 
-            String insertSql = """
+            /*String insertSql = """
                 INSERT INTO secured_endpoint (secured_endpoint_id, resource, action, path, description)
                 VALUES (?, ?, ?, ?, ?)
-                """;
+                """;*/
 
-            String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
+            //String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
 
             LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
 
@@ -51,7 +51,7 @@ public class SchemaInitializer {
                 runner.runScript(reader);
                 conn.commit();
 
-                insertEndpoints(conn, endpoints, insertSql, checkSql);
+                //insertEndpoints(conn, endpoints, insertSql, checkSql);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to run extension SQL script for Postgresql", e);
             }
@@ -80,7 +80,7 @@ public class SchemaInitializer {
                 }
 
                 insertStmt.setString(1, securedEndpointId);
-                insertStmt.setString(2, endpoint.getResource());
+                //insertStmt.setString(2, endpoint.getResource());
                 insertStmt.setString(3, endpoint.getAction());
                 insertStmt.setString(4, endpoint.getPath());
                 insertStmt.setString(5, endpoint.getDescription());
@@ -100,7 +100,7 @@ public class SchemaInitializer {
     }
 
     private String generateSecuredEndpointId(EndpointMetadata endpoint) {
-        String raw = endpoint.getResource() + endpoint.getAction() + endpoint.getPath();
+        String raw = endpoint.getAction() + endpoint.getPath();
         try {
             var digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));

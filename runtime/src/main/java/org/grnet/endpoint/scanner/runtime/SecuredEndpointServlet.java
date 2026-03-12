@@ -20,9 +20,9 @@ public class SecuredEndpointServlet extends HttpServlet {
 
         resp.setContentType("application/json");
 
-        var holder = CDI.current().select(SecuredEndpointService.class).get();
+        var holder = CDI.current().select(EndpointMetadataHolder.class).get();
 
-        var json = mapper.writeValueAsString(holder.findAll());
+        var json = mapper.writeValueAsString(holder.getData());
         resp.getWriter().write(json);
     }
 }

@@ -5,6 +5,7 @@ import io.quarkus.agroal.spi.JdbcDataSourceBuildItem;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
 import io.quarkus.arc.deployment.BeanContainerBuildItem;
+import io.quarkus.arc.deployment.BeanContainerListenerBuildItem;
 import io.quarkus.arc.deployment.InterceptorBindingRegistrarBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeansRuntimeInitBuildItem;
@@ -39,23 +40,26 @@ import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 class EndpointScannerProcessor {
 
     private static final String FEATURE = "endpoint-scanner";
 
-    private static final Set<DotName> HTTP_METHODS = Set.of(
-            DotName.createSimple("jakarta.ws.rs.GET"),
-            DotName.createSimple("jakarta.ws.rs.POST"),
-            DotName.createSimple("jakarta.ws.rs.PUT"),
-            DotName.createSimple("jakarta.ws.rs.DELETE"),
-            DotName.createSimple("jakarta.ws.rs.PATCH"),
-            DotName.createSimple("jakarta.ws.rs.HEAD"),
-            DotName.createSimple("jakarta.ws.rs.OPTIONS")
+    private static final Map<DotName, String> HTTP_METHOD_NAMES = Map.of(
+            DotName.createSimple("jakarta.ws.rs.GET"),    "GET",
+            DotName.createSimple("jakarta.ws.rs.POST"),   "POST",
+            DotName.createSimple("jakarta.ws.rs.PUT"),    "PUT",
+            DotName.createSimple("jakarta.ws.rs.DELETE"), "DELETE",
+            DotName.createSimple("jakarta.ws.rs.PATCH"),  "PATCH"
     );
 
     private static final DotName PATH = DotName.createSimple("jakarta.ws.rs.Path");
@@ -85,9 +89,13 @@ class EndpointScannerProcessor {
 
             var method = annotation.target().asMethod();
 
-            boolean isEndpoint = method.annotations().stream().anyMatch(a -> HTTP_METHODS.contains(a.name()));
+            String httpMethod = method.annotations().stream()
+                    .filter(a -> HTTP_METHOD_NAMES.containsKey(a.name()))
+                    .map(a -> HTTP_METHOD_NAMES.get(a.name()))
+                    .findFirst()
+                    .orElse(null);
 
-            if (!isEndpoint) {
+            if (httpMethod == null) {
                 continue; // not a REST endpoint
             }
 
@@ -115,11 +123,19 @@ class EndpointScannerProcessor {
             // Combine them, normalizing slashes
             var fullPath = normalizePath(classPath, methodPath);
 
-            var resource = annotation.value("resource").asString();
-            var action = annotation.value("action").asString();
-            var description = annotation.value("description").asString();
+            String description = "There is no description for this endpoint!";
 
-            addEndpoint(endpoints, new EndpointMetadata(resource, action, fullPath, description));
+            var operationAnnotation = method.annotation(DotName.createSimple("org.eclipse.microprofile.openapi.annotations.Operation"));
+
+            if (operationAnnotation != null) {
+                var descriptionValue = operationAnnotation.value("description");
+
+                if (descriptionValue != null) {
+                    description = descriptionValue.asString();
+                }
+            }
+
+            addEndpoint(endpoints, new EndpointMetadata(generateSecuredEndpointId(httpMethod, fullPath), httpMethod, fullPath, description));
         }
 
         return new EndpointMetadataBuildItem(endpoints);
@@ -140,10 +156,21 @@ class EndpointScannerProcessor {
     private void addEndpoint(List<EndpointMetadata> endpoints, EndpointMetadata endpoint) {
         if (endpoints.contains(endpoint)) {
             throw new IllegalArgumentException(
-                    "Duplicate endpoint detected: resource=%s, action=%s, path=%s"
-                            .formatted(endpoint.getResource(), endpoint.getAction(), endpoint.getPath()));
+                    "Duplicate endpoint detected: action=%s, path=%s"
+                            .formatted(endpoint.getAction(), endpoint.getPath()));
         }
         endpoints.add(endpoint);
+    }
+
+    private String generateSecuredEndpointId(String httpMethod, String path) {
+        var raw = httpMethod + path;
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to generate securedEndpointId hash", e);
+        }
     }
 
     @BuildStep
@@ -204,10 +231,29 @@ class EndpointScannerProcessor {
     @BuildStep
     @Consume(BeanContainerBuildItem.class)
     @Record(ExecutionTime.RUNTIME_INIT)
-    public void startActions(EndpointRecorder recorder, BeanArchiveIndexBuildItem indexBuildItem) {
+    public void startActions(EndpointRecorder recorder) {
+
+        recorder.initSchema();
+    }
+
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)  // or RUNTIME_INIT
+    SecuredEndpointMetadataBuildItem processAndRecord(EndpointRecorder recorder, BeanArchiveIndexBuildItem indexBuildItem) {
 
         var builder = scan(indexBuildItem);
-        recorder.initSchema(builder.getEndpoints());
+
+        // Pass build-time data to the recorder → produces a RuntimeValue
+        var metadata = recorder.storeSecuredEndpointMetadata(builder.getEndpoints());
+
+        // Wire it into the CDI bean
+        return new SecuredEndpointMetadataBuildItem(metadata);
+    }
+
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, BuildProducer<BeanContainerListenerBuildItem> listeners) {
+
+        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
     }
 
     @BuildStep
@@ -226,7 +272,6 @@ class EndpointScannerProcessor {
         jpaModel.produce(new AdditionalJpaModelBuildItem(SecuredEndpoint.class.getName()));
 
         panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
-
     }
 
     private Set<String> getDataSourceNames(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
