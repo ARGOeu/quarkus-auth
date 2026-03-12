@@ -46,14 +46,16 @@ The library must be configured to understand which entitlement namespace and par
 The following parameters must be set:
 
 ```
-api.auth.entitlements.parent.group=parent-group-name
+api.auth.entitlements.parent-group=parent-group-name
 api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
+api.auth.entitlements.super-admin-role=super_admin
 ```
 
 These settings define:
 
 - The entitlement namespace that the library should match.
 - The root parent group, which may include multiple hierarchical subgroups.
+- Defines the role name assigned to the parent group that grants super admin privileges for the API. Any user belonging to a group with this role is treated as a super admin and is given full administrative access.
 
 ### 2.4 Consistent Entitlement Structure
 
@@ -199,24 +201,13 @@ To allow the library to correctly filter and evaluate only the entitlements that
 
 ---
 ```properties
-api.auth.entitlements.parent.group=parent-group-name
+api.auth.entitlements.parent-group=parent-group-name
 api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
+api.auth.entitlements.super-admin-role=super_admin
 ```
 ---
 These parameters instruct the authorization library to inspect only the entitlements that match the configured namespace and the parent group hierarchy.
 
-#### 4.3.1 Hierarchical Parent Group Structure
-
-The parent-group value represents the root of a hierarchical group structure, which may contain multiple nested subgroups. An entitlement may therefore belong not only to the parent group itself but also to any subgroup at any depth.
-This enables fine-grained authorization aligned with real organizational structures.
-
-```
-<namespace>:<parent-group>:role=<role-name>
-<namespace>:<parent-group>/subgroup1:role=<role-name>
-<namespace>:<parent-group>/subgroup1/subgroup2:role=<role-name>
-```
-
----
 
 ### 4.4 Assigning Entitlements to a User
 
@@ -243,7 +234,40 @@ Once these attributes are set, the **quarkus-auth** library will automatically r
 
 ---
 
-## 5. Using Entitlement Annotations
+## 5. Dynamic Authorization Endpoints
+
+This module provides dynamic authorization management for REST endpoints based on RCIAM group membership. It allows you to define secured endpoints declaratively using annotations, expose them dynamically, and map them to user groups and roles stored in a database.
+
+### 5.1 Secured Endpoint Annotation
+
+---
+```java
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+public @interface SecuredEndpoint {
+
+    String resource();
+    String description();
+}
+```
+---
+
+- resource: The resource type (e.g., TENANT).
+- description: Human-readable description of the endpoint.
+
+These annotations define the potential secured endpoints that the system will recognize.
+
+#### 5.1.1 Dynamic Endpoint Discovery
+
+A Quarkus extension scans the application at build time for all @SecuredEndpoint annotations. It then exposes a dynamic endpoint at:
+
+
+```bash
+GET /secured-endpoints
+```
+
+This endpoint returns a JSON list of all potential secured endpoints:
+
 
 The library exposes the annotation:
 

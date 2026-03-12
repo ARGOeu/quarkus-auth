@@ -9,7 +9,7 @@ import jakarta.ws.rs.ForbiddenException;
 import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
 
 @Interceptor
-@SecuredEndpoint(resource = "", action = "", description = "")
+@SecuredEndpoint
 @Priority(10)
 public class SecuredEndpointInterceptor {
 

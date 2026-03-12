@@ -5,7 +5,9 @@ import io.quarkus.agroal.runtime.AgroalDataSourceUtil;
 import io.quarkus.arc.ActiveResult;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.SyntheticCreationalContext;
+import io.quarkus.arc.runtime.BeanContainerListener;
 import io.quarkus.datasource.common.runtime.DataSourceUtil;
+import io.quarkus.runtime.RuntimeValue;
 import io.quarkus.runtime.annotations.Recorder;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
@@ -45,7 +47,7 @@ public class EndpointRecorder {
         };
     }
 
-    public void initSchema(List<EndpointMetadata> endpoints) {
+    public void initSchema() {
 
         LOG.info("Secured Endpoints extension: Initializing schema...");
 
@@ -55,7 +57,7 @@ public class EndpointRecorder {
 
             var dbKind = ConfigProvider.getConfig().getValue("quarkus.datasource.db-kind", String.class);
 
-            schemaInitializer.get().createTables(dbKind, endpoints);
+            schemaInitializer.get().createTables(dbKind);
         } else {
 
             LOG.info("Secured Endpoints extension: Relational database schema initializer was deactivated...");
@@ -67,6 +69,17 @@ public class EndpointRecorder {
 
             var dataSource = context.getInjectedReference(AgroalDataSource.class);
             return new SchemaInitializer(dataSource);
+        };
+    }
+
+    public RuntimeValue<List<EndpointMetadata>> storeSecuredEndpointMetadata(List<EndpointMetadata> data) {
+        return new RuntimeValue<>(data);
+    }
+
+    public BeanContainerListener configureBeanContainer(RuntimeValue<List<EndpointMetadata>> metadata) {
+        return beanContainer -> {
+            var bean = beanContainer.beanInstance(EndpointMetadataHolder.class);
+            bean.setData(metadata.getValue());
         };
     }
 }

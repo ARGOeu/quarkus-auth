@@ -8,8 +8,4 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 public @interface SecuredEndpoint {
-
-    String resource();
-    String action();
-    String description();
 }
