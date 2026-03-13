@@ -16,23 +16,18 @@ import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Produce;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
-import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
-import io.quarkus.hibernate.orm.deployment.spi.AdditionalJpaModelBuildItem;
-import io.quarkus.hibernate.orm.panache.deployment.PanacheEntityClassBuildItem;
-import io.quarkus.logging.Log;
 import io.quarkus.undertow.deployment.ServletBuildItem;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
-import org.grnet.endpoint.scanner.runtime.entities.SecuredEndpoint;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.MyExtensionResource;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
 import org.grnet.endpoint.scanner.runtime.services.SecuredEndpointService;
 import org.jboss.jandex.AnnotationInstance;
@@ -186,6 +181,7 @@ class EndpointScannerProcessor {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(MyExtensionResource.class));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(MyExtensionResource.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorization.class.getName()));
     }
 
     @BuildStep
@@ -254,24 +250,6 @@ class EndpointScannerProcessor {
     void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, BuildProducer<BeanContainerListenerBuildItem> listeners) {
 
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
-    }
-
-    @BuildStep
-    void registerEntities(BuildProducer<AdditionalJpaModelBuildItem> jpaModel, BuildProducer<PanacheEntityClassBuildItem> panacheEntities, CombinedIndexBuildItem index) {
-
-        var entityClassInfo = index.getIndex()
-                .getClassByName(DotName.createSimple(ResourceAuthorization.class.getName()));
-
-        jpaModel.produce(new AdditionalJpaModelBuildItem(ResourceAuthorization.class.getName()));
-
-        panacheEntities.produce(new PanacheEntityClassBuildItem(entityClassInfo));
-
-        var securedEndpointClassInfo = index.getIndex()
-                .getClassByName(DotName.createSimple(SecuredEndpoint.class.getName()));
-
-        jpaModel.produce(new AdditionalJpaModelBuildItem(SecuredEndpoint.class.getName()));
-
-        panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
     }
 
     private Set<String> getDataSourceNames(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
