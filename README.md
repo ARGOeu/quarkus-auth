@@ -85,23 +85,23 @@ The library requires:
 
 ### 3.1 Overview
 
-Our library uses an authentication model based on a pair of OIDC clients: a public client and a confidential client secured with a client secret. 
-The public client is responsible for requesting access tokens from the Identity Provider. 
-Since it is public, it does not store or use a client secret and is intended for environments such as browser applications. 
+Our library uses an authentication model based on a pair of OIDC clients: a public client and a confidential client secured with a client secret.
+The public client is responsible for requesting access tokens from the Identity Provider.
+Since it is public, it does not store or use a client secret and is intended for environments such as browser applications.
 Once the public client initiates authentication, it obtains an access token.
 
 ### 3.2 Token Request and Validation
 
-When the public client retrieves an access token and sends it to the API. The API performs a verification step through token introspection. 
+When the public client retrieves an access token and sends it to the API. The API performs a verification step through token introspection.
 This introspection is carried out by the second client in the pair, the confidential client, which possesses a client secret and is treated as a trusted backend application.
 
-The API forwards the received token to the Identity Provider’s introspection endpoint while authenticating as the confidential client using its client ID and client secret. 
-The Identity Provider responds with information describing whether the token is active, along with its subject, expiration timestamp, scopes and any other relevant attributes. 
+The API forwards the received token to the Identity Provider’s introspection endpoint while authenticating as the confidential client using its client ID and client secret.
+The Identity Provider responds with information describing whether the token is active, along with its subject, expiration timestamp, scopes and any other relevant attributes.
 Using this information, the API decides whether access should be granted. If the token has expired or is marked as inactive, the API denies the request.
 
 ### 3.3 Requirements for API Integration
 
-In order to integrate with our API, you must create this pair of clients in the Identity Provider. 
+In order to integrate with our API, you must create this pair of clients in the Identity Provider.
 The public client handles obtaining access tokens, and the confidential client performs introspection and authorization checks on behalf of the backend.
 Both clients together establish the authentication mechanism required for accessing the protected API endpoints.
 
@@ -109,19 +109,19 @@ We use Keycloak internally, but you may use any OIDC-compliant provider. Regardl
 
 #### 3.3.1 Creating a Public Client in Keycloak
 
-To create a public client in Keycloak, a user must configure a client that does not use a client secret and supports flows typically intended for applications that cannot safely store secrets. 
+To create a public client in Keycloak, a user must configure a client that does not use a client secret and supports flows typically intended for applications that cannot safely store secrets.
 
-A user begins by navigating to the “Clients” area of the Keycloak administration console and choosing to create a new client. 
+A user begins by navigating to the “Clients” area of the Keycloak administration console and choosing to create a new client.
 The client must be set to the OpenID Connect type, and the access type should be configured as public.
-Since public clients cannot store secrets, Keycloak automatically disables client authentication for them. Redirect URIs and Web Origins must also be configured, to ensure that the client can properly complete authentication flows. 
+Since public clients cannot store secrets, Keycloak automatically disables client authentication for them. Redirect URIs and Web Origins must also be configured, to ensure that the client can properly complete authentication flows.
 Once these settings follow the recommended instructions, the public client is ready to request tokens from Keycloak.
 
 #### 3.3.2 Creating a Confidential (Client Secret) Client in Keycloak
 
-A confidential client in Keycloak is designed to run on the server side and securely store a client secret. 
+A confidential client in Keycloak is designed to run on the server side and securely store a client secret.
 
-A user starts by creating a new client and selecting OpenID Connect as the client protocol. 
-The access type must be set to confidential, which activates client authentication and enables the generation and use of a client secret. 
+A user starts by creating a new client and selecting OpenID Connect as the client protocol.
+The access type must be set to confidential, which activates client authentication and enables the generation and use of a client secret.
 Within the client’s settings, the administrator can review or regenerate the client secret under the “Credentials” tab.
 Once these settings follow the recommended instructions, the confidential client can be used by backend services to validate tokens through introspection.
 
@@ -157,14 +157,14 @@ quarkus.oidc.introspection-path=/protocol/openid-connect/token/introspect
 
 ### 3.5 Using the Public Client to Obtain an Access Token
 
-Applications that cannot securely store secrets, such as browser-based applications, must use the public client to obtain an access token from Keycloak. 
-The public client is intended for environments where the application runs on the end user’s device and cannot protect confidential credentials. 
+Applications that cannot securely store secrets, such as browser-based applications, must use the public client to obtain an access token from Keycloak.
+The public client is intended for environments where the application runs on the end user’s device and cannot protect confidential credentials.
 To authenticate, the application initiates the appropriate OIDC flow, typically the Authorization Code flow, and requests an access token using the public client configuration.
 
-The applications is responsible for specifying the scopes required for the access token. Different APIs may require different scopes depending on the information they need to access during token introspection. 
+The applications is responsible for specifying the scopes required for the access token. Different APIs may require different scopes depending on the information they need to access during token introspection.
 For example, our API typically expects scopes such as `voperson_id`, `entitlements`, and `profile` in order to retrieve the relevant user information.
-However, the exact set of scopes should be determined by the application according to the specific API endpoints it intends to call. 
-Once the application receives the access token with the appropriate scopes, it must include the token in the `Authorization` header using `Bearer Authentication` when making requests to the API. 
+However, the exact set of scopes should be determined by the application according to the specific API endpoints it intends to call.
+Once the application receives the access token with the appropriate scopes, it must include the token in the `Authorization` header using `Bearer Authentication` when making requests to the API.
 The API then performs token introspection and uses the scopes and other token attributes to evaluate access permissions for the requested operation.
 
 ---
@@ -173,10 +173,10 @@ The API then performs token introspection and uses the scopes and other token at
 
 ### 4.1 Overview
 
-Our API uses an authorization model that relies on the user’s entitlements. Each user may have one or more entitlements that represent the permissions or roles assigned to them. 
-When a client sends a request with an access token, the API performs token introspection using the confidential client to validate the token and retrieve the user’s entitlements. 
-These entitlements are then evaluated to determine whether the user is allowed to access the requested resource or perform the requested action. 
-Access to API endpoints is granted only if the user’s entitlements meet the requirements defined for the resource. 
+Our API uses an authorization model that relies on the user’s entitlements. Each user may have one or more entitlements that represent the permissions or roles assigned to them.
+When a client sends a request with an access token, the API performs token introspection using the confidential client to validate the token and retrieve the user’s entitlements.
+These entitlements are then evaluated to determine whether the user is allowed to access the requested resource or perform the requested action.
+Access to API endpoints is granted only if the user’s entitlements meet the requirements defined for the resource.
 This model allows fine-grained authorization and ensures that each user can only access the resources for which they have explicit entitlements, providing a secure and flexible way to manage access control across the API.
 
 ### 4.2 Required Scope for Entitlement Retrieval
@@ -246,21 +246,18 @@ This module provides dynamic authorization management for REST endpoints based o
 @Target({ElementType.METHOD, ElementType.TYPE})
 public @interface SecuredEndpoint {
 
-    String resource();
-    String description();
 }
 ```
 ---
-
-- resource: The resource type (e.g., TENANT).
-- description: Human-readable description of the endpoint.
 
 These annotations define the potential secured endpoints that the system will recognize.
 
 #### 5.1.1 Dynamic Endpoint Discovery
 
-A Quarkus extension scans the application at build time for all @SecuredEndpoint annotations. It then exposes a dynamic endpoint at:
+A Quarkus extension scans the application at build time for all @SecuredEndpoint annotations. It iterates over every occurrence of the @SecuredEndpoint annotation, filtering only method-level targets to exclude class-level or interceptor usages.
+For each qualifying method, it resolves the HTTP verb and constructs the relative endpoint path by combining the class-level and method-level @Path values from jakarta.ws.rs. If a @Operation annotation from org.eclipse.microprofile.openapi.annotations is present, its description field is extracted and associated with the endpoint; otherwise a default placeholder message is used. Each discovered endpoint is assigned a deterministic unique identifier generated by hashing the HTTP method and relative path using SHA-256, ensuring a stable, collision-resistant ID.
 
+All collected metadata is then made available to a dynamic endpoint at:
 
 ```bash
 GET /secured-endpoints
@@ -268,34 +265,54 @@ GET /secured-endpoints
 
 This endpoint returns a JSON list of all potential secured endpoints:
 
-
-The library exposes the annotation:
-
-```
-@CheckEntitlements 
-```
-
-You can use it in these forms:
-
 ---
-
-### Super Admin Only
-
-```java
-@CheckEntitlements(requireSuperAdmin = true)
-public class AdminEndpoint {    }
+```json
+[
+  {
+    "action": "GET",
+    "path": "/v1/tenants/{id}",
+    "description": "Returns a specific tenant assessment.",
+    "secured_endpoint_id": "921fb6a55236e237eb7c08fe7b4c645be3611b36a179d7b6d371c267bf834758"
+  },
+  {
+    "action": "PUT",
+    "path": "/v1/tenants/{id}",
+    "description": "Updates a specific tenant.",
+    "secured_endpoint_id": "8bdfcb7f1256ab1710b86b4bad1260882e9943c4348e23e6e7e765495d99f9d5"
+  },
+  {
+    "action": "GET",
+    "path": "/v1/tenants/{id}/projects",
+    "description": "Retrieves a list of projects that tenant belongs",
+    "secured_endpoint_id": "c216f1aae92607adc816e2db64edc42f041f2e57e01cff1fd50e6d868f253e7f"
+  },
+  {
+    "action": "POST",
+    "path": "/v1/encrypt",
+    "description": "Encrypts the provided plain text secret using AES PBKDF2 and system key.",
+    "secured_endpoint_id": "f34641f7515ec0f99198b28f2787c722be07b89c9dc7f8224697b4882c6b3afc"
+  },
+  {
+    "action": "GET",
+    "path": "/v1/users/profile",
+    "description": "This endpoint retrieves the user profile information.",
+    "secured_endpoint_id": "b32ecfacefb21f938fdbb135d02aaaf2782a99558868a87e348157a4788b40e9"
+  },
+  {
+    "action": "POST",
+    "path": "/v1/users/registration",
+    "description": "Registers the authenticated user as a platform member. This is a self-registration operation.",
+    "secured_endpoint_id": "eaffd4d8007a9ba1ed4c8e72ea0c279973dd64718b53f1f2685892cae86f5adb"
+  },
+  {
+    "action": "GET",
+    "path": "/v1/users/pages",
+    "description": "Registers the authenticated user as a platform member. This is a self-registration operation.",
+    "secured_endpoint_id": "6f6107c3cfafe78ff61eeadc23bc84668323bf589e41aad733bad66ef8b968ea"
+  }
+]
 ```
-
-Users must hold the `super_admin` entitlement assigned to members of your parent group.
-
 ---
-
-### Check Specific Group + Role
-
-```java
-@CheckEntitlements(group = "groupName", role = "roleName")
-public class StatusEndpoint {    }
-```
 
 The user must:
 
@@ -309,7 +326,7 @@ The user must:
 ```java
 @Path("/v1/admin")
 @Authenticated
-@CheckEntitlements(requireSuperAdmin = true)
+@SecuredEndpoint
 public class AdminEndpoint {
 }
 ```
@@ -383,6 +400,6 @@ To use `quarkus-auth`, you must:
 1. Install the `.jar` using `mvn install:install-file`
 2. Add the dependency to `pom.xml`
 3. Include all required properties in `application.properties`
-4. Use `@CheckEntitlements(...)` where access control is needed
+4. Use `@SecuredEndpoint` where access control is needed
 
 Your Quarkus project is now fully integrated with central entitlement-based authorization.
