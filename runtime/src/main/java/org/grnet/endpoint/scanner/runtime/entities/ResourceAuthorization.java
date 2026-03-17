@@ -1,33 +1,20 @@
 package org.grnet.endpoint.scanner.runtime.entities;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.SequenceGenerator;
-import jakarta.persistence.Table;
-
+import java.sql.Time;
 import java.time.OffsetDateTime;
-import java.util.List;
 
-@Entity
-@Table(name = "resource_authorization")
-public class ResourceAuthorization extends PanacheEntityBase {
+public class ResourceAuthorization {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String name;
 
-    @Column(name = "created_at")
-    private OffsetDateTime createdAt;
+    private Time createdAt;
 
-    public static List<ResourceAuthorization> listAll(){
-        return findAll().list();
+    public ResourceAuthorization(Long id, String name, Time createdAt) {
+        this.id = id;
+        this.name = name;
+        this.createdAt = createdAt;
     }
 
     public String getName() {
@@ -38,11 +25,11 @@ public class ResourceAuthorization extends PanacheEntityBase {
         this.name = name;
     }
 
-    public OffsetDateTime getCreatedAt() {
+    public Time getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(OffsetDateTime createdAt) {
+    public void setCreatedAt(Time createdAt) {
         this.createdAt = createdAt;
     }
 

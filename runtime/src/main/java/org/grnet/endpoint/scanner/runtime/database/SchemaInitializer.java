@@ -1,8 +1,12 @@
 package org.grnet.endpoint.scanner.runtime.database;
 
 import io.agroal.api.AgroalDataSource;
+import io.quarkus.arc.Arc;
+import io.quarkus.arc.InjectableInstance;
 import io.quarkus.datasource.common.runtime.DatabaseKind;
+import jakarta.enterprise.inject.Instance;
 import org.apache.ibatis.jdbc.ScriptRunner;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.jboss.logging.Logger;
 
@@ -21,42 +25,45 @@ public class SchemaInitializer {
 
     private static final Logger LOG = Logger.getLogger(SchemaInitializer.class);
 
-    private final AgroalDataSource dataSource;
+    public void createTables() {
 
-    public SchemaInitializer(AgroalDataSource dataSource) {
-        this.dataSource = dataSource;
-    }
+        var ds = Arc.container().select(AgroalDataSource.class);
 
-    public void createTables(String dbKind) {
+        if (!ds.isUnsatisfied() && ds.getHandle().getBean().isActive()){
 
-        if(DatabaseKind.isPostgreSQL(dbKind)){
+            var dbKind = ConfigProvider.getConfig().getValue("quarkus.datasource.db-kind", String.class);
+
+            if(DatabaseKind.isPostgreSQL(dbKind)){
 
             /*String insertSql = """
                 INSERT INTO secured_endpoint (secured_endpoint_id, resource, action, path, description)
                 VALUES (?, ?, ?, ?, ?)
                 """;*/
 
-            //String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
+                //String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
 
-            LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
+                LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
 
-            try (Connection conn = dataSource.getConnection(); var reader = new InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream("/db/postgresql/init.sql")))) {
+                try (Connection conn = ds.get().getConnection(); var reader = new InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream("/db/postgresql/init.sql")))) {
 
-                var runner = new ScriptRunner(conn);
-                runner.setAutoCommit(false);       // use transactions
-                runner.setStopOnError(true);
-                runner.setSendFullScript(true);    // PostgreSQL handles full scripts well
-                runner.setLogWriter(null);         // suppress output
-                runner.setErrorLogWriter(null);
-                runner.runScript(reader);
-                conn.commit();
+                    var runner = new ScriptRunner(conn);
+                    runner.setAutoCommit(false);       // use transactions
+                    runner.setStopOnError(true);
+                    runner.setSendFullScript(true);    // PostgreSQL handles full scripts well
+                    runner.setLogWriter(null);         // suppress output
+                    runner.setErrorLogWriter(null);
+                    runner.runScript(reader);
+                    conn.commit();
 
-                //insertEndpoints(conn, endpoints, insertSql, checkSql);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to run extension SQL script for Postgresql", e);
+                    //insertEndpoints(conn, endpoints, insertSql, checkSql);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to run extension SQL script for Postgresql", e);
+                }
+            } else {
+                throw new RuntimeException("Unsupported database kind: " + dbKind);
             }
         } else {
-            throw new RuntimeException("Unsupported database kind: " + dbKind);
+            LOG.info("No JDBC data source found...");
         }
     }
 

@@ -6,7 +6,6 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 
 import java.util.List;
 
@@ -18,7 +17,7 @@ public class MyExtensionResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<ResourceAuthorization> hello() {
+    public List<?> hello() {
         return resourceAuthorizationService.findAll();
     }
 }

@@ -1,22 +1,23 @@
 package org.grnet.endpoint.scanner.runtime.services;
 
+import io.quarkus.arc.InjectableInstance;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.transaction.Transactional;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
+import jakarta.inject.Inject;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationRepository;
 
-import java.time.OffsetDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @ApplicationScoped
 public class ResourceAuthorizationService {
 
-    @Transactional
-    public List<ResourceAuthorization> findAll() {
+    @Inject
+    ResourceAuthorizationRepository repository;
 
-       var ra = new ResourceAuthorization();
-       ra.setName("lalalala");
-       ra.setCreatedAt(OffsetDateTime.now());
-       ResourceAuthorization.persist(ra);
-       return ResourceAuthorization.listAll();
+    public List<?> findAll() {
+
+        return repository.findAll();
     }
 }
