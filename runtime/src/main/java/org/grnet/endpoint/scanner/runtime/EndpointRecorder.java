@@ -11,6 +11,7 @@ import io.quarkus.runtime.RuntimeValue;
 import io.quarkus.runtime.annotations.Recorder;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationMongoRepository;
 import org.jboss.logging.Logger;
 
 import java.util.Collection;
@@ -27,6 +28,10 @@ public class EndpointRecorder {
     public Supplier<ActiveResult> databaseCheckIsActive(Collection<String> names) {
 
         return () -> {
+
+            if(names.isEmpty()){
+                return ActiveResult.inactive("There is no jdbc datasource.");
+            }
 
             var optional = names.stream().filter(DataSourceUtil::isDefault).findFirst();
 
@@ -53,23 +58,15 @@ public class EndpointRecorder {
 
         var schemaInitializer = Arc.container().select(SchemaInitializer.class);
 
-        if (schemaInitializer.isResolvable() && schemaInitializer.getHandle().getBean().isActive()) {
-
-            var dbKind = ConfigProvider.getConfig().getValue("quarkus.datasource.db-kind", String.class);
-
-            schemaInitializer.get().createTables(dbKind);
-        } else {
-
-            LOG.info("Secured Endpoints extension: Relational database schema initializer was deactivated...");
-        }
+        schemaInitializer.get().createTables();
     }
 
     public Function<SyntheticCreationalContext<SchemaInitializer>, SchemaInitializer> createSchemaInitializer() {
-        return context -> {
+        return context -> new SchemaInitializer();
+    }
 
-            var dataSource = context.getInjectedReference(AgroalDataSource.class);
-            return new SchemaInitializer(dataSource);
-        };
+    public Function<SyntheticCreationalContext<ResourceAuthorizationMongoRepository>, ResourceAuthorizationMongoRepository> createMongoRepo() {
+        return context -> new ResourceAuthorizationMongoRepository();
     }
 
     public RuntimeValue<List<EndpointMetadata>> storeSecuredEndpointMetadata(List<EndpointMetadata> data) {

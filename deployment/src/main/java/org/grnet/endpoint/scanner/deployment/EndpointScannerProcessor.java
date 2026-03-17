@@ -1,6 +1,5 @@
 package org.grnet.endpoint.scanner.deployment;
 
-import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.spi.JdbcDataSourceBuildItem;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.BeanArchiveIndexBuildItem;
@@ -22,18 +21,19 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongo;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.MyExtensionResource;
 import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
-import org.grnet.endpoint.scanner.runtime.services.SecuredEndpointService;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
-import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
+import org.jboss.logging.Logger;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -46,6 +46,8 @@ import java.util.Map;
 import java.util.Set;
 
 class EndpointScannerProcessor {
+
+    private static final Logger LOG = Logger.getLogger(EndpointScannerProcessor.class);
 
     private static final String FEATURE = "endpoint-scanner";
 
@@ -147,8 +149,8 @@ class EndpointScannerProcessor {
         return classPath + methodPath;
     }
 
-
     private void addEndpoint(List<EndpointMetadata> endpoints, EndpointMetadata endpoint) {
+
         if (endpoints.contains(endpoint)) {
             throw new IllegalArgumentException(
                     "Duplicate endpoint detected: action=%s, path=%s"
@@ -158,6 +160,7 @@ class EndpointScannerProcessor {
     }
 
     private String generateSecuredEndpointId(String httpMethod, String path) {
+
         var raw = httpMethod + path;
         try {
             var digest = MessageDigest.getInstance("SHA-256");
@@ -181,7 +184,7 @@ class EndpointScannerProcessor {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(MyExtensionResource.class));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(MyExtensionResource.class.getName()));
-        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorization.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationMongo.class.getName()));
     }
 
     @BuildStep
@@ -195,34 +198,47 @@ class EndpointScannerProcessor {
 
     @BuildStep
     List<AdditionalBeanBuildItem> registerBeans() {
+
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(OIDCEntitlementService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
-                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
-                AdditionalBeanBuildItem.unremovableOf(SecuredEndpointService.class)
+                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class)
         );
     }
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
     @Produce(SyntheticBeansRuntimeInitBuildItem.class)
-    void syntheticBean(EndpointRecorder recorder, List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems, BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer) {
-
-        var datasourceNames = getDataSourceNames(jdbcDataSourceBuildItems);
+    void syntheticBean(EndpointRecorder recorder, BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer) {
 
         var initializer = SyntheticBeanBuildItem
                 .configure(SchemaInitializer.class)
                 .scope(ApplicationScoped.class)
                 .setRuntimeInit()
-                .startup()
                 .unremovable()
-                .addInjectionPoint(ClassType.create(DotName.createSimple(AgroalDataSource.class)))
-                .startup()
-                .createWith(recorder.createSchemaInitializer())
-                .checkActive(recorder.databaseCheckIsActive(datasourceNames));
+                .createWith(recorder.createSchemaInitializer());
 
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
     }
+
+    @BuildStep
+    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+
+        Class<?> implementation;
+
+        if (!jdbcDataSourceBuildItems.isEmpty()) {
+            implementation = ResourceAuthorizationJdbcRepository.class;
+        } else {
+            implementation = ResourceAuthorizationMongoRepository.class;
+        }
+
+        return AdditionalBeanBuildItem
+                .builder()
+                .addBeanClass(implementation)
+                .setUnremovable()
+                .build();
+    }
+
 
     @BuildStep
     @Consume(BeanContainerBuildItem.class)
