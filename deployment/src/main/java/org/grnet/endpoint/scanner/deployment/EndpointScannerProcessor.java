@@ -17,7 +17,6 @@ import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
-import io.quarkus.undertow.deployment.ServletBuildItem;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
@@ -31,6 +30,8 @@ import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Acto
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Setting;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.PersistenceEntitlementMongoRepository;
+import org.grnet.endpoint.scanner.runtime.*;
+import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongo;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
@@ -44,10 +45,9 @@ import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.OidcEntitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.PersistenceEntitlement;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
-import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
-import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.MyExtensionResource;
+import org.grnet.endpoint.scanner.runtime.services.SecuredEndpointService;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassType;
@@ -192,23 +192,18 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    ServletBuildItem createServlet() {
-
-        return ServletBuildItem.builder("endpoint-scanner", SecuredEndpointServlet.class.getName())
-                .addMapping("/secured-endpoints")
-                .build();
-    }
-
-    @BuildStep
     void registerResource(BuildProducer<AdditionalIndexedClassesBuildItem> additionalIndexedClasses, BuildProducer<AdditionalBeanBuildItem> additionalBeans) {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(MyExtensionResource.class));
+        additionalBeans.produce(new AdditionalBeanBuildItem(SecuredEndpointResource.class));
+
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(MyExtensionResource.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationMongo.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlements.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Setting.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.class.getName()));
     }
 
     @BuildStep
@@ -226,7 +221,10 @@ class EndpointScannerProcessor {
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
-                AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class)
+                AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
+                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
+                AdditionalBeanBuildItem.unremovableOf(SecuredEndpointService.class),
+                AdditionalBeanBuildItem.unremovableOf(SecuredEndpointResource.class)
         );
     }
 
