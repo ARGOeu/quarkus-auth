@@ -1,7 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.entities;
 
 import java.sql.Time;
-import java.time.OffsetDateTime;
 
 public class ResourceAuthorization {
 

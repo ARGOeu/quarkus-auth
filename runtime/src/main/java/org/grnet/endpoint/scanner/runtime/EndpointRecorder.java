@@ -1,17 +1,22 @@
 package org.grnet.endpoint.scanner.runtime;
 
-import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.runtime.AgroalDataSourceUtil;
 import io.quarkus.arc.ActiveResult;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.SyntheticCreationalContext;
 import io.quarkus.arc.runtime.BeanContainerListener;
 import io.quarkus.datasource.common.runtime.DataSourceUtil;
+import io.quarkus.oidc.TokenIntrospection;
 import io.quarkus.runtime.RuntimeValue;
 import io.quarkus.runtime.annotations.Recorder;
+import io.smallrye.config.SmallRyeConfig;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
+import org.grnet.endpoint.scanner.runtime.entitlements.PersistenceEntitlementService;
+import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
 import org.jboss.logging.Logger;
 
 import java.util.Collection;
@@ -29,13 +34,13 @@ public class EndpointRecorder {
 
         return () -> {
 
-            if(names.isEmpty()){
+            if (names.isEmpty()) {
                 return ActiveResult.inactive("There is no jdbc datasource.");
             }
 
             var optional = names.stream().filter(DataSourceUtil::isDefault).findFirst();
 
-            if(optional.isEmpty()){
+            if (optional.isEmpty()) {
 
                 return ActiveResult.inactive("There is no default datasource.");
             } else {
@@ -58,7 +63,10 @@ public class EndpointRecorder {
 
         var schemaInitializer = Arc.container().select(SchemaInitializer.class);
 
-        schemaInitializer.get().createTables();
+        if (schemaInitializer.getHandle().getBean().isActive()) {
+
+            schemaInitializer.get().createTables();
+        }
     }
 
     public Function<SyntheticCreationalContext<SchemaInitializer>, SchemaInitializer> createSchemaInitializer() {
@@ -77,6 +85,29 @@ public class EndpointRecorder {
         return beanContainer -> {
             var bean = beanContainer.beanInstance(EndpointMetadataHolder.class);
             bean.setData(metadata.getValue());
+        };
+    }
+
+    public Function<SyntheticCreationalContext<PersistenceEntitlementService>, PersistenceEntitlementService> createPersistenceEntitlementService() {
+        return context -> {
+            // ServiceA is index 0, ServiceB is index 1
+            var a = context.getInjectedReference(PersistenceEntitlementRepository.class);
+            var b = context.getInjectedReference(UserContextInterface.class);
+
+            return new PersistenceEntitlementService(a, b);
+        };
+    }
+
+    public Function<SyntheticCreationalContext<OIDCEntitlementService>, OIDCEntitlementService> createOidcEntitlementService() {
+        return context -> {
+            // ServiceA is index 0, ServiceB is index 1
+            var a = context.getInjectedReference(TokenIntrospection.class);
+
+            var config = ConfigProvider.getConfig()
+                    .unwrap(SmallRyeConfig.class)
+                    .getConfigMapping(SecuredEndpointConfig.class);
+
+            return new OIDCEntitlementService(a, config);
         };
     }
 }
