@@ -64,6 +64,7 @@ public class SchemaInitializer {
             }
         } else {
             LOG.info("No JDBC data source found...");
+            throw new RuntimeException("No JDBC data source found...");
         }
     }
 

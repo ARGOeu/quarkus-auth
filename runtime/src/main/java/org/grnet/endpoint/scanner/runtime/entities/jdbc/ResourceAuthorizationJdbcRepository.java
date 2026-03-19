@@ -1,8 +1,10 @@
-package org.grnet.endpoint.scanner.runtime.entities;
+package org.grnet.endpoint.scanner.runtime.entities.jdbc;
 
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
+import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationRepository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,7 +12,6 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 
-@ApplicationScoped
 public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizationRepository {
 
     @Inject

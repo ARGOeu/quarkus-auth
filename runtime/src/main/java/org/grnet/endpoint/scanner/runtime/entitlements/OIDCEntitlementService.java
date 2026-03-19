@@ -9,18 +9,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@ApplicationScoped
-public class OIDCEntitlementService {
+public class OIDCEntitlementService implements EntitlementService {
 
-    @Inject
-    TokenIntrospection tokenIntrospection;
+    private final TokenIntrospection tokenIntrospection;
 
-    @Inject
-    SecuredEndpointConfig config;
+    private final SecuredEndpointConfig config;
+
+    public OIDCEntitlementService(TokenIntrospection tokenIntrospection, SecuredEndpointConfig config) {
+        this.tokenIntrospection = tokenIntrospection;
+        this.config = config;
+    }
 
     /**
      * Extracts and parses entitlements from the OIDC token.
      */
+    @Override
     public List<Entitlement> fetchEntitlements() {
 
         var arr = tokenIntrospection.getJsonObject().getJsonArray("entitlements");
@@ -40,8 +43,6 @@ public class OIDCEntitlementService {
 
     public boolean isSuperAdmin(List<Entitlement> entitlements){
 
-        return entitlements
-                .stream()
-                .anyMatch(entitlement -> entitlement.getGroup().equals(config.parentGroup()) && entitlement.getRole().equals(config.superAdminRole()));
+        return isSuperAdmin(entitlements, config);
     }
 }

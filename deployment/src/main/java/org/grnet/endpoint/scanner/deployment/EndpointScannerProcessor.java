@@ -16,22 +16,41 @@ import io.quarkus.deployment.annotations.Produce;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
+import io.quarkus.oidc.TokenIntrospection;
 import io.quarkus.undertow.deployment.ServletBuildItem;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationJdbcRepository;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Actor;
+import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.ActorEntitlements;
+import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement;
+import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Setting;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.PersistenceEntitlementMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongo;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.PersistenceEntitlementCodecProvider;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.SettingCodec;
+import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProviderWithPersistence;
+import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProviderWithoutPersistence;
+import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementService;
+import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
+import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.OidcEntitlement;
+import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.PersistenceEntitlement;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.MyExtensionResource;
-import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
+import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
 import org.jboss.logging.Logger;
 
@@ -44,6 +63,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 class EndpointScannerProcessor {
 
@@ -185,6 +205,10 @@ class EndpointScannerProcessor {
         additionalBeans.produce(new AdditionalBeanBuildItem(MyExtensionResource.class));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(MyExtensionResource.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationMongo.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlements.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Setting.class.getName()));
     }
 
     @BuildStep
@@ -200,45 +224,114 @@ class EndpointScannerProcessor {
     List<AdditionalBeanBuildItem> registerBeans() {
 
         return List.of(
-                AdditionalBeanBuildItem.unremovableOf(OIDCEntitlementService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
-                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class)
+                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
+                AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class)
         );
     }
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
     @Produce(SyntheticBeansRuntimeInitBuildItem.class)
-    void syntheticBean(EndpointRecorder recorder, BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer) {
+    void syntheticBean(EndpointRecorder recorder, BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer,
+                       List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+
+        var names = getDataSourceNames(jdbcDataSourceBuildItems);
 
         var initializer = SyntheticBeanBuildItem
                 .configure(SchemaInitializer.class)
                 .scope(ApplicationScoped.class)
                 .setRuntimeInit()
                 .unremovable()
-                .createWith(recorder.createSchemaInitializer());
+                .createWith(recorder.createSchemaInitializer())
+                .checkActive(recorder.databaseCheckIsActive(names));
+
+        var oidcEntitlementService = SyntheticBeanBuildItem
+                .configure(EntitlementService.class)
+                .scope(ApplicationScoped.class)
+                .setRuntimeInit()
+                .unremovable()
+                .addQualifier()
+                .annotation(DotName.createSimple(OidcEntitlement.class))
+                .done()
+                .addInjectionPoint(ClassType.create(DotName.createSimple(TokenIntrospection.class.getName())))
+                .createWith(recorder.createOidcEntitlementService());
+
+        if(jdbcDataSourceBuildItems.isEmpty()){
+
+            var persistenceEntitlementService = SyntheticBeanBuildItem
+                    .configure(EntitlementService.class)
+                    .scope(ApplicationScoped.class)
+                    .setRuntimeInit()
+                    .unremovable()
+                    .addQualifier()
+                    .annotation(DotName.createSimple(PersistenceEntitlement.class))
+                    .done()
+                    .addInjectionPoint(ClassType.create(DotName.createSimple(PersistenceEntitlementRepository.class.getName())))
+                    .addInjectionPoint(ClassType.create(DotName.createSimple(UserContextInterface.class.getName())))
+                    .createWith(recorder.createPersistenceEntitlementService());
+
+            syntheticBeanBuildItemBuildProducer.produce(persistenceEntitlementService.done());
+        }
 
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
+        syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
     }
 
     @BuildStep
-    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+    List<AdditionalBeanBuildItem> selectBeans(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
 
-        Class<?> implementation;
+        Class<?> resourceAuthorizationImplementation;
+        Class<?> persistenceEntitlementImplementation;
+        Class<?> entitlementProviderImplementation;
 
         if (!jdbcDataSourceBuildItems.isEmpty()) {
-            implementation = ResourceAuthorizationJdbcRepository.class;
+            resourceAuthorizationImplementation = ResourceAuthorizationJdbcRepository.class;
+            persistenceEntitlementImplementation = PersistenceEntitlementJDBCRepository.class;
+            entitlementProviderImplementation = EntitlementProviderWithoutPersistence.class;
         } else {
-            implementation = ResourceAuthorizationMongoRepository.class;
+            resourceAuthorizationImplementation = ResourceAuthorizationMongoRepository.class;
+            persistenceEntitlementImplementation = PersistenceEntitlementMongoRepository.class;
+            entitlementProviderImplementation = EntitlementProviderWithPersistence.class;
         }
 
-        return AdditionalBeanBuildItem
+        return List.of(AdditionalBeanBuildItem
                 .builder()
-                .addBeanClass(implementation)
+                .addBeanClass(resourceAuthorizationImplementation)
                 .setUnremovable()
-                .build();
+                .build(), AdditionalBeanBuildItem
+                .builder()
+                .addBeanClass(persistenceEntitlementImplementation)
+                .setUnremovable()
+                .build(), AdditionalBeanBuildItem
+                .builder()
+                .addBeanClass(entitlementProviderImplementation)
+                .setUnremovable()
+                .build());
     }
 
+    @BuildStep(onlyIf = IsMongoPresent.class)
+    void registerCodecProvider(BuildProducer<AdditionalIndexedClassesBuildItem> additionalIndexedClasses) {
+        LOG.info("Registering mongo related classes...");
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorCodec.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EntitlementCodec.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlementsCodec.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SettingCodec.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PersistenceEntitlementCodecProvider.class.getName()));
+    }
+
+    public static class IsMongoPresent implements BooleanSupplier {
+        @Override
+        public boolean getAsBoolean() {
+            try {
+                Class.forName("io.quarkus.mongodb.deployment.CodecProviderBuildItem");
+                LOG.info("Mongo CodecProviderBuildItem found in class path...");
+                return true;
+            } catch (ClassNotFoundException e) {
+                return false;
+            }
+        }
+    }
 
     @BuildStep
     @Consume(BeanContainerBuildItem.class)

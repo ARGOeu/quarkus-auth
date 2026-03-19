@@ -1,17 +1,9 @@
 package org.grnet.endpoint.scanner.runtime.entities.mongo;
 
-import io.quarkus.mongodb.panache.PanacheMongoEntityBase;
-import io.quarkus.mongodb.panache.common.MongoEntity;
-import org.bson.codecs.pojo.annotations.BsonId;
-import org.bson.codecs.pojo.annotations.BsonProperty;
+public class ResourceAuthorizationMongo  {
 
-@MongoEntity(collection = "resource_authorization")
-public class ResourceAuthorizationMongo extends PanacheMongoEntityBase {
-
-    @BsonId
     private Long id;
 
-    @BsonProperty("secured_endpoint_id")
     private String securedEndpointId;
 
     public Long getId() {
