@@ -99,12 +99,6 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
             ps.executeUpdate();
 
-//            try (ResultSet rs = ps.getGeneratedKeys()) {
-//                if (rs.next()) {
-//                    entity.setId(rs.getLong(1));
-//                }
-//            }
-
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
