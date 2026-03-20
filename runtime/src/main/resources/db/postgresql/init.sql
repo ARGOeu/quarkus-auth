@@ -1,14 +1,18 @@
 CREATE TABLE IF NOT EXISTS resource_authorization (
-    id SERIAL PRIMARY KEY,
-    name        VARCHAR(255)        NOT NULL,
-    created_at  TIMESTAMPTZ         NOT NULL DEFAULT now()
-);
+    id                  SERIAL PRIMARY KEY,
+    secured_endpoint_id VARCHAR(255) NOT NULL,
+    rule                VARCHAR(255) NOT NULL,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (secured_endpoint_id, rule)
+    );
 
-CREATE TABLE IF NOT EXISTS secured_endpoint (
-    id          BIGSERIAL PRIMARY KEY,
-    secured_endpoint_id VARCHAR(255) NOT NULL UNIQUE,
-    resource    VARCHAR(255) NOT NULL,
-    action      VARCHAR(255) NOT NULL,
-    path        VARCHAR(255) NOT NULL,
-    description VARCHAR(255) NOT NULL
-);
+
+CREATE TABLE IF NOT EXISTS endpoint_resolver (
+    id                  SERIAL PRIMARY KEY,
+    secured_endpoint_id VARCHAR(255) NOT NULL,
+    resource                VARCHAR(255) NOT NULL,
+    original_field         VARCHAR(255) NOT NULL,
+    mapped_field         VARCHAR(255) NOT NULL,
+    created_at          TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE (secured_endpoint_id, resource,original_field)
+    );

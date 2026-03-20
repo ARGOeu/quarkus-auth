@@ -40,9 +40,4 @@ public class OIDCEntitlementService implements EntitlementService {
 
         return EntitlementUtils.parseEntitlements(raws);
     }
-
-    public boolean isSuperAdmin(List<Entitlement> entitlements){
-
-        return isSuperAdmin(entitlements, config);
-    }
 }

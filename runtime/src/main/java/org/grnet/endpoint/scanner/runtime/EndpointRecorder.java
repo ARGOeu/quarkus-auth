@@ -59,7 +59,7 @@ public class EndpointRecorder {
 
     public void initSchema() {
 
-        LOG.info("Secured Endpoints extension: Initializing schema...");
+      //  LOG.info("Secured Endpoints extension: Initializing schema...");
 
         var schemaInitializer = Arc.container().select(SchemaInitializer.class);
 
