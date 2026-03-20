@@ -1,5 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.endpoints;
 
+import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -10,9 +11,12 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeIn;
+import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
@@ -25,6 +29,13 @@ import java.sql.Timestamp;
 import java.util.List;
 
 @Path("/secured-endpoints")
+@Authenticated
+@SecurityScheme(securitySchemeName = "Authentication",
+        description = "JWT token",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        in = SecuritySchemeIn.HEADER)
 public class SecuredEndpointResource {
     @Inject
     EndpointResolverService endpointResolverService;
@@ -35,11 +46,11 @@ public class SecuredEndpointResource {
     @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "List all secured endpoints",
-            description = "Returns a list of all status pages."
+            description = "Returns a list of secured endpoints."
     )
     @APIResponse(
             responseCode = "200",
-            description = "List of all secured endpoints",
+            description = "List of all secured endpoints.",
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = PageableSecuredEndpoints.class)))
@@ -82,12 +93,12 @@ public class SecuredEndpointResource {
 
     @Tag(name = "Secured Endpoints")
     @Operation(
-            summary = "Create authorization rule for a secured enpoint",
+            summary = "Create authorization rule for a secured endpoint.",
             description = "Create authorization rule."
     )
     @APIResponse(
             responseCode = "200",
-            description = "Successfully created rule",
+            description = "Successfully created rule.",
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
@@ -139,12 +150,12 @@ public class SecuredEndpointResource {
 
     @Tag(name = "Secured Endpoints")
     @Operation(
-            summary = "Update authorization rules for a secured endpoint",
-            description = "Update authorization rules for a secured endpoint"
+            summary = "Update authorization rules for a secured endpoint.",
+            description = "Update authorization rules for a secured endpoint."
     )
     @APIResponse(
             responseCode = "200",
-            description = "Successfully updated rules",
+            description = "Successfully updated rules.",
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
@@ -188,12 +199,12 @@ public class SecuredEndpointResource {
 
     @Tag(name = "Secured Endpoints")
     @Operation(
-            summary = "Create mapping between entity fields for endpoint  in order to resolve",
-            description = "Create mapping between entity fields for endpoint  in order to resolve"
+            summary = "Create mapping between entity fields for endpoint  in order to resolve.",
+            description = "Create mapping between entity fields for endpoint in order to resolve."
     )
     @APIResponse(
             responseCode = "200",
-            description = "Successfully updated rules",
+            description = "Successfully updated rules.",
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
