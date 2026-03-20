@@ -36,14 +36,6 @@ public class SchemaInitializer {
 
             if(DatabaseKind.isPostgreSQL(dbKind)){
 
-            /*String insertSql = """
-                INSERT INTO secured_endpoint (secured_endpoint_id, resource, action, path, description)
-                VALUES (?, ?, ?, ?, ?)
-                """;*/
-
-                //String checkSql = "SELECT COUNT(*) FROM secured_endpoint WHERE secured_endpoint_id = ?";
-
-
                 LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
 
                 try (Connection conn = ds.get().getConnection(); var reader = new InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream("/db/postgresql/init.sql")))) {
@@ -57,7 +49,6 @@ public class SchemaInitializer {
                     runner.runScript(reader);
                     conn.commit();
 
-                    //insertEndpoints(conn, endpoints, insertSql, checkSql);
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to run extension SQL script for Postgresql", e);
                 }
@@ -67,17 +58,6 @@ public class SchemaInitializer {
         } else {
             LOG.info("No JDBC data source found...");
             throw new RuntimeException("No JDBC data source found...");
-        }
-    }
-
-    private String generateSecuredEndpointId(EndpointMetadata endpoint) {
-        String raw = endpoint.getAction() + endpoint.getPath();
-        try {
-            var digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate securedEndpointId hash", e);
         }
     }
 }

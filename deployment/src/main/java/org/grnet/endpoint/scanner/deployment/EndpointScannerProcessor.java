@@ -12,11 +12,12 @@ import io.quarkus.deployment.builditem.AdditionalIndexedClassesBuildItem;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
-import io.quarkus.undertow.deployment.ServletBuildItem;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
+import org.grnet.endpoint.scanner.runtime.endpoints.PageLink;
+import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
 import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.EndpointResolverJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
@@ -34,6 +35,8 @@ import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlements
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.PersistenceEntitlementCodecProvider;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.SettingCodec;
+import org.grnet.endpoint.scanner.runtime.entities.pagination.Page;
+import org.grnet.endpoint.scanner.runtime.entities.pagination.PageQuery;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProviderWithPersistence;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProviderWithoutPersistence;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementService;
@@ -49,7 +52,6 @@ import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
 import org.grnet.endpoint.scanner.runtime.services.ResolverConfigService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
-import org.grnet.endpoint.scanner.runtime.SecuredEndpointServlet;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
 import org.jboss.jandex.AnnotationInstance;
@@ -196,14 +198,6 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    ServletBuildItem createServlet() {
-
-        return ServletBuildItem.builder("endpoint-scanner", SecuredEndpointServlet.class.getName())
-                .addMapping("/secured-endpoints")
-                .build();
-    }
-
-    @BuildStep
     void registerResource(BuildProducer<AdditionalIndexedClassesBuildItem> additionalIndexedClasses, BuildProducer<AdditionalBeanBuildItem> additionalBeans) {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(SecuredEndpointResource.class));
@@ -213,6 +207,12 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlements.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Setting.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageLink.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageResource.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Page.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageQuery.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.PageableSecuredEndpoints.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EndpointMetadata.class.getName()));
     }
 
     @BuildStep
@@ -230,7 +230,6 @@ class EndpointScannerProcessor {
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
-
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
                 AdditionalBeanBuildItem.unremovableOf(RepositoryRegistry.class),
@@ -289,24 +288,6 @@ class EndpointScannerProcessor {
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
         syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
     }
-//
-//    @BuildStep
-//    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
-//
-//        Class<?> implementation;
-//
-//        if (!jdbcDataSourceBuildItems.isEmpty()) {
-//            implementation = ResourceAuthorizationJdbcRepository.class;
-//        } else {
-//            implementation = ResourceAuthorizationMongoRepository.class;
-//        }
-//
-//        return AdditionalBeanBuildItem
-//                .builder()
-//                .addBeanClass(implementation)
-//                .setUnremovable()
-//                .build();
-//    }
 
     @BuildStep
     List<AdditionalBeanBuildItem> selectBeans(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
@@ -423,45 +404,6 @@ class EndpointScannerProcessor {
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
     }
 
-    //    @BuildStep
-//    void registerEntities(BuildProducer<AdditionalJpaModelBuildItem> jpaModel, BuildProducer<PanacheEntityClassBuildItem> panacheEntities, CombinedIndexBuildItem index) {
-//
-//        var entityClassInfo = index.getIndex()
-//                .getClassByName(DotName.createSimple(ResourceAuthorization.class.getName()));
-//
-//        jpaModel.produce(new AdditionalJpaModelBuildItem(ResourceAuthorization.class.getName()));
-//
-//        panacheEntities.produce(new PanacheEntityClassBuildItem(entityClassInfo));
-//
-//        var securedEndpointClassInfo = index.getIndex()
-//                .getClassByName(DotName.createSimple(SecuredEndpoint.class.getName()));
-//
-//        jpaModel.produce(new AdditionalJpaModelBuildItem(SecuredEndpoint.class.getName()));
-//
-//        panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));   panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
-//
-//        var endpointResolverClassInfo = index.getIndex()
-//                .getClassByName(DotName.createSimple(EndpointResolver.class.getName()));
-//
-//        jpaModel.produce(new AdditionalJpaModelBuildItem(EndpointResolver.class.getName()));
-//
-//        panacheEntities.produce(new PanacheEntityClassBuildItem(endpointResolverClassInfo));   panacheEntities.produce(new PanacheEntityClassBuildItem(securedEndpointClassInfo));
-//}
-//    @BuildStep
-//    void keepRepositories(BuildProducer<UnremovableBeanBuildItem> unremovableBeans,
-//                          CombinedIndexBuildItem index) {
-//
-//        var repoInterface = DotName.createSimple("io.quarkus.hibernate.orm.panache.PanacheRepositoryBase");
-//
-//        var repos = index.getIndex().getAllKnownImplementors(repoInterface);
-//
-//        for (var repo : repos) {
-//            unremovableBeans.produce(
-//                    UnremovableBeanBuildItem.beanClassNames(repo.name().toString())
-//            );
-//        }
-//    }
-
     @BuildStep
     void markResourceRepositoriesUnremovable(
             CombinedIndexBuildItem index,
@@ -486,17 +428,4 @@ class EndpointScannerProcessor {
         }
         return result;
     }
-
-//    @BuildStep
-//    void registerRepositories(CombinedIndexBuildItem combinedIndex,
-//                              BuildProducer<AdditionalBeanBuildItem> beans) {
-//
-//        var repoInterface = DotName.createSimple(
-//                "io.quarkus.hibernate.orm.panache.PanacheRepositoryBase"
-//        );
-//
-//        for (var repo : combinedIndex.getIndex().getAllKnownImplementors(repoInterface)) {
-//            beans.produce(AdditionalBeanBuildItem.unremovableOf(repo.name().toString()));
-//        }
-//    }
 }
