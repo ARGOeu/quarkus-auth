@@ -34,6 +34,7 @@ import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.PersistenceEntitlementCodecProvider;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ResourceAuthorizationCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.SettingCodec;
 import org.grnet.endpoint.scanner.runtime.entities.pagination.Page;
 import org.grnet.endpoint.scanner.runtime.entities.pagination.PageQuery;
@@ -321,7 +322,6 @@ class EndpointScannerProcessor {
                 .setUnremovable()
                 .build(), AdditionalBeanBuildItem
                 .builder()
-
                 .addBeanClass(persistenceEntitlementImplementation)
                 .setUnremovable()
                 .build(), AdditionalBeanBuildItem
@@ -339,6 +339,7 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EntitlementCodec.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlementsCodec.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SettingCodec.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationCodec.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PersistenceEntitlementCodecProvider.class.getName()));
     }
 
@@ -353,26 +354,6 @@ class EndpointScannerProcessor {
                 return false;
             }
         }
-    }
-
-    AdditionalBeanBuildItem selectRepositories(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
-
-        boolean useJdbc = !jdbcDataSourceBuildItems.isEmpty();
-
-        AdditionalBeanBuildItem.Builder builder = AdditionalBeanBuildItem.builder()
-                .setUnremovable();
-
-        if (useJdbc) {
-            builder
-                    .addBeanClass(ResourceAuthorizationJdbcRepository.class)
-                    .addBeanClass(EndpointResolverJdbcRepository.class);
-        } else {
-            builder
-                    .addBeanClass(ResourceAuthorizationMongoRepository.class);
-            // .addBeanClass(EndpointResolverMongoRepository.class);
-        }
-
-        return builder.build();
     }
 
     @BuildStep

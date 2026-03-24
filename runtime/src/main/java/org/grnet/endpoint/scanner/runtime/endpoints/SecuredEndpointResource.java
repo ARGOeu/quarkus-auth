@@ -2,8 +2,10 @@ package org.grnet.endpoint.scanner.runtime.endpoints;
 
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
@@ -15,6 +17,7 @@ import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeIn;
 import org.eclipse.microprofile.openapi.annotations.enums.SecuritySchemeType;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -25,8 +28,10 @@ import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
+
+import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
 
 @Path("/secured-endpoints")
 @Authenticated
@@ -76,10 +81,12 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
     public Response getSecuredEndpoints(
+            @Parameter(name = "page", in = QUERY, description = "Indicates the page number. Page number must be >= 1.")
             @DefaultValue("1")
             @Min(value = 1, message = "Page number must be >= 1.")
             @QueryParam("page")
             int page,
+            @Parameter(name = "size", in = QUERY, description = "The page size.")
             @DefaultValue("10")
             @Min(value = 1, message = "Page size must be between 1 and 100.")
             @Max(value = 100, message = "Page size must be between 1 and 100.")
@@ -131,16 +138,19 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-    public List<ResourceAuthorization> addAuthorizations(
-            @PathParam("secured-endpoint-id") String id,
-            AuthorizationRequest request) {
+    public List<ResourceAuthorization> addAuthorizations(@Parameter(
+            description = "The unique secured endpoint id.",
+            required = true,
+            example = "d9ae97f603809444ad911be3b30596462003d11bb06e928ac005bf4b1bb8c4a9",
+            schema = @Schema(type = SchemaType.STRING)) @PathParam("secured-endpoint-id") String id,
+            @Valid @NotNull(message = "The request body is empty.") AuthorizationRequest request) {
 
         for (String regex : request.rules) {
 
-            ResourceAuthorization re=new ResourceAuthorization();
+            var re = new ResourceAuthorization();
             re.setSecuredEndpointId(id);
             re.setRule(regex);
-            re.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+            re.setCreatedAt(LocalDateTime.now());
 
             resourceAuthorizationService.authorize(re);
         }
@@ -188,13 +198,16 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-    public List<ResourceAuthorization> updateAuthorizations(
-            @PathParam("secured-endpoint-id") String securedEndpointId,
-            AuthorizationRequest request) {
+    public List<ResourceAuthorization> updateAuthorizations(@Parameter(
+            description = "The unique secured endpoint id.",
+            required = true,
+            example = "d9ae97f603809444ad911be3b30596462003d11bb06e928ac005bf4b1bb8c4a9",
+            schema = @Schema(type = SchemaType.STRING)) @PathParam("secured-endpoint-id") String securedEndpointId,
+            @Valid @NotNull(message = "The request body is empty.") AuthorizationRequest request) {
 
         resourceAuthorizationService.updateAuthorizations(securedEndpointId, request.rules);
 
-        return resourceAuthorizationService.findByEndpointsecuredEndpointId(securedEndpointId);
+        return resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
     }
 
     @Tag(name = "Secured Endpoints")
@@ -237,16 +250,19 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-    public List<EndpointResolver> addResolvedField(
-            @PathParam("secured-endpoint-id") String id,
-            EndpointResolverRequest request) {
+    public List<EndpointResolver> addResolvedField(@Parameter(
+            description = "The unique secured endpoint id.",
+            required = true,
+            example = "d9ae97f603809444ad911be3b30596462003d11bb06e928ac005bf4b1bb8c4a9",
+            schema = @Schema(type = SchemaType.STRING)) @PathParam("secured-endpoint-id") String id,
+            @Valid @NotNull(message = "The request body is empty.") EndpointResolverRequest request) {
 
         var e = new EndpointResolver();
         e.setResource(request.resource);
         e.setMappedField(request.mapped_field);
         e.setOriginalField(request.original_field);
         e.setSecuredEndpointId(id);
-        e.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+        e.setCreatedAt(LocalDateTime.now());
         endpointResolverService.addResolvedField(e);
 
         return endpointResolverService.findAllEndpointResolverByEndpoint(id);

@@ -1,25 +1,55 @@
 package org.grnet.endpoint.scanner.runtime.entities.mongo;
 
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import jakarta.inject.Inject;
+import org.bson.Document;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.grnet.endpoint.scanner.runtime.entities.EndpointResolver;
 import org.grnet.endpoint.scanner.runtime.entities.EndpointResolverRepository;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
+
 public class EndpointResolverMongoRepository implements EndpointResolverRepository {
+
+    @Inject
+    MongoClient mongoClient;
+
+    @ConfigProperty(name = "quarkus.mongodb.database")
+    String database;
+
+
     @Override
     public List<EndpointResolver> findAll() {
-        return List.of();
+        return getCollectionByClass(EndpointResolver.class)
+                .find()
+                .into(new ArrayList<>());
     }
 
     @Override
-    public List list(String column, String id) {
-        return List.of();
+    public List<EndpointResolver> list(String column, String id) {
+        return getCollectionByClass(EndpointResolver.class)
+                .find(and(
+                        eq(column, id)
+                )).into(new ArrayList<>());
     }
-
 
     @Override
     public void create(EndpointResolver entity) {
+        getCollectionByClass(EndpointResolver.class).insertOne(entity);
+    }
+
+    private <T> MongoCollection<T> getCollectionByClass(Class<T> clazz){
+        return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName(), clazz);
+    }
+
+    private MongoCollection<Document> getCollection(Class<?> clazz){
+        return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName());
     }
 }
 

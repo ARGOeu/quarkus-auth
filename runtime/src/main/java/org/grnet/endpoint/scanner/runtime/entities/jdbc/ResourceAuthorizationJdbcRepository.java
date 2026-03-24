@@ -4,9 +4,9 @@ import io.agroal.api.AgroalDataSource;
 import jakarta.inject.Inject;
 import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationRepository;
-//import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorizationRepository;
 
 import java.sql.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,11 +26,13 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
+                var ts = rs.getTimestamp("created_at");
+                var createdAt = ts.toLocalDateTime();
                 var user = new ResourceAuthorization(
                         rs.getLong("id"),
                         rs.getString("secured_endpoint_id"),
                         rs.getString("rule"),
-                        rs.getTimestamp("created_at")
+                        createdAt
                 );
                 users.add(user);
             }
@@ -65,11 +67,13 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+                    var ts = rs.getTimestamp("created_at");
+                    var createdAt = ts.toLocalDateTime();
                     var user = new ResourceAuthorization(
                             rs.getLong("id"),
                             rs.getString("secured_endpoint_id"),
                             rs.getString("rule"),
-                            rs.getTimestamp("created_at")
+                            createdAt
                     );
                     results.add(user);
                 }
@@ -93,9 +97,10 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
             ps.setString(2, entity.getRule());
 
             if (entity.getCreatedAt() == null) {
-                entity.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+                entity.setCreatedAt(LocalDateTime.now());
             }
-            ps.setTimestamp(3, entity.getCreatedAt());
+
+            ps.setTimestamp(3, Timestamp.valueOf(entity.getCreatedAt()));
 
             ps.executeUpdate();
 

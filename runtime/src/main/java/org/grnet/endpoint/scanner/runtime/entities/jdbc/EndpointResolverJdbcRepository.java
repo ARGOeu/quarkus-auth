@@ -25,13 +25,16 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
              ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
+
+                var ts = rs.getTimestamp("created_at");
+                var createdAt = ts.toLocalDateTime();
                 var user = new EndpointResolver(
                         rs.getLong("id"),
                         rs.getString("secured_endpoint_id"),
                         rs.getString("resource"),
                         rs.getString("original_field"),
                         rs.getString("mapped_field"),
-                        rs.getTimestamp("created_at")
+                        createdAt
                 );
                 users.add(user);
             }
@@ -73,13 +76,16 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+
+                    var ts = rs.getTimestamp("created_at");
+                    var createdAt = ts.toLocalDateTime();
                     var user = new EndpointResolver(
                             rs.getLong("id"),
                             rs.getString("secured_endpoint_id"),
                             rs.getString("resource"),
                             rs.getString("original_field"),
                             rs.getString("mapped_field"),
-                            rs.getTimestamp("created_at")
+                            createdAt
                     );
                     results.add(user);
                 }
@@ -106,13 +112,6 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
             ps.setString(4, entity.getMappedField());
 
             ps.executeUpdate();
-
-//            try (ResultSet rs = ps.getGeneratedKeys()) {
-//
-//                if (rs.next()) {
-//                    entity.setId(rs.getString(1));
-//                }
-//            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);

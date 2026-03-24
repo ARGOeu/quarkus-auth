@@ -3,6 +3,7 @@ package org.grnet.endpoint.scanner.runtime.entities;
 
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 public class EndpointResolver  {
     private Long id;
@@ -14,18 +15,11 @@ public class EndpointResolver  {
     private String originalField;
 
     private String mappedField;
-    private Timestamp createdAt;
 
-//    public static List<EndpointResolver> listAll(){
-//        return findAll().list();
-//    }
-//    // --- Static finder method ---
-//    public static List<EndpointResolver> findBySecuredEndpointId(String securedEndpointId) {
-//        return list("securedEndpointId", securedEndpointId);
-//    }
+    private LocalDateTime createdAt;
 
 
-    public EndpointResolver(Long id, String securedEndpointId, String resource, String originalField, String mappedField, Timestamp createdAt) {
+    public EndpointResolver(Long id, String securedEndpointId, String resource, String originalField, String mappedField, LocalDateTime createdAt) {
         this.id = id;
         this.securedEndpointId = securedEndpointId;
         this.resource = resource;
@@ -62,11 +56,11 @@ public class EndpointResolver  {
         this.mappedField = mappedField;
     }
 
-    public Timestamp getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Timestamp createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
