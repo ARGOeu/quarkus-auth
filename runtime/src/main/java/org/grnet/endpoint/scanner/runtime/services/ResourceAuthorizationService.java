@@ -2,7 +2,6 @@ package org.grnet.endpoint.scanner.runtime.services;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.ws.rs.core.UriInfo;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
@@ -56,10 +55,6 @@ public class ResourceAuthorizationService {
                         i -> list.subList(i, min(i + pageSize, list.size()))));
     }
 
-    public List<ResourceAuthorization> findAll() {
-        return repository.findAll();
-    }
-
     public List<?> findByEndpointId(String id) {
         return repository.list("id", id);
     }
@@ -70,6 +65,22 @@ public class ResourceAuthorizationService {
     }
     public List<ResourceAuthorization> findByEndpointSecuredEndpointId(String securedEndpointId) {
         return repository.list("secured_endpoint_id", securedEndpointId);
+    }
+
+    public List<ResourceAuthorization> findAllResourcesAuthorization() {
+        return repository.findAllResourceAuthorization();
+    }
+    public void delete(Long id) {
+        repository.delete(id);
+    }
+
+
+    public ResourceAuthorization findById(Long id) {
+        return repository.findById(id);
+    }
+
+    public void update(ResourceAuthorization resourceAuthorization) {
+     repository.update(resourceAuthorization);
     }
 
     public void updateAuthorizations(String endpointId, List<String> requestedRules) {

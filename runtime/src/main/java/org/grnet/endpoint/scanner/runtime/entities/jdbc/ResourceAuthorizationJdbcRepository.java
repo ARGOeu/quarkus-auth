@@ -17,7 +17,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
     AgroalDataSource dataSource;
 
     @Override
-    public List<ResourceAuthorization> findAll() {
+    public List<ResourceAuthorization> findAllResourceAuthorization() {
         String sql = "SELECT * FROM resource_authorization";
         List<ResourceAuthorization> users = new ArrayList<>();
 
@@ -85,6 +85,34 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
         return results;
     }
+    public ResourceAuthorization findById(Long id) {
+        String sql = "SELECT * FROM resource_authorization WHERE id = ?";
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, id);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    var ts = rs.getTimestamp("created_at");
+                    var createdAt = ts.toLocalDateTime();
+
+                    return new ResourceAuthorization(
+                            rs.getLong("id"),
+                            rs.getString("secured_endpoint_id"),
+                            rs.getString("rule"),
+                            createdAt
+                    );
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Error fetching ResourceAuthorization with id " + id, e);
+        }
+
+        return null; // or throw NotFoundException if you prefer
+    }
 
     @Override
     public void create(ResourceAuthorization entity) {
@@ -104,7 +132,35 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
             ps.executeUpdate();
 
+
         } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public void delete(Long id) {
+        String sql = "DELETE FROM resource_authorization WHERE id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void update(ResourceAuthorization re) {
+        String sql = "UPDATE resource_authorization SET rule = ?, created_at = ? WHERE id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, re.getRule());
+            ps.setTimestamp(2, Timestamp.valueOf(re.getCreatedAt()));
+
+            ps.setLong(3, re.getId());
+
+            ps.executeUpdate();
+
+        } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }

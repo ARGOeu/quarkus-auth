@@ -11,6 +11,7 @@ import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.UriInfo;
+import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
 import org.grnet.endpoint.scanner.runtime.resolvers.TestGroupIdResolver;
@@ -27,6 +28,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Interceptor
 @SecuredEndpoint
@@ -44,9 +46,9 @@ public class SecuredEndpointInterceptor {
 
     @Inject
     Instance<GroupIdResolver> resolverInstances;
-
     @Inject
     SecuredEndpointConfig config;
+
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
 
     @AroundInvoke
@@ -54,59 +56,32 @@ public class SecuredEndpointInterceptor {
 
         var entitlements = entitlementProvider.fetchEntitlements();
 
-        if(entitlementProvider.isSuperAdmin(config)){
+        if (entitlementProvider.isSuperAdmin(config)) {
             return context.proceed();
         }
 
-        // 2️⃣ Determine HTTP method and full path
-        var method = context.getMethod(); // Java reflection Method
-        var httpMethod = getHttpMethod(method); // e.g., GET, POST, etc.
-        var fullPath = buildFullPath(context, method); // combine class + method @Path
+        Method method = context.getMethod();
+        String httpMethod = getHttpMethod(method);
+        String fullPath = buildFullPath(context, method);
 
-        // 3️⃣ Generate securedEndpointId hash
         String securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
 
-        // 4️⃣ Retrieve ResourceAuthorization from DB
         var authList = resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
         if (authList.isEmpty()) {
             throw new ForbiddenException("You cannot access this resource!");
         }
 
-        // 6️⃣ Get tenantId & topologyId from method args
-        MultivaluedMap<String, String> pathParams = uriInfo.getPathParameters();
+        // Map of request path params
+        Map<String, String> pathParams = uriInfo.getPathParameters()
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().get(0)
+                ));
 
-        boolean hasAccess = entitlements.stream()
-                .anyMatch(e -> authList.stream()
-                        .anyMatch(ra -> {
-                            try {
-                                var resolvedRegex = resolveRegex(securedEndpointId, method, ra.getRule());
-                                // Replace placeholders
-                                for (Map.Entry<String, List<String>> entry : pathParams.entrySet()) {
-
-                                    String key = entry.getKey();
-                                    String value = entry.getValue().get(0);
-
-                                    if (resolvedRegex.contains("{" + key + "}")) {
-                                        resolvedRegex = resolvedRegex.replace("{" + key + "}", value);
-                                    }
-                                }
-
-                                // Escape braces
-                                String escapedRegex = resolvedRegex.replace("{", "\\{").replace("}", "\\}");
-                                // Compile pattern and match
-                                Pattern pattern = Pattern.compile(escapedRegex);
-                                var matches=pattern.matcher(e.getRaw()).matches();
-                                return pattern.matcher(e.getRaw()).matches();
-
-
-
-                            } catch (Exception ex) {
-                                // Skip this regex if it fails
-                         //       Log.warn("Skipping regex for  " + ra.getName() + " due to exception: " + ex.getMessage());
-                                return false; // continue to next ra
-                            }
-                        })
-                );
+        boolean hasAccess = authList.stream()
+                .anyMatch(ra -> matchesRule(entitlements, ra.getRule(), pathParams, securedEndpointId, method));
 
         if (!hasAccess) {
             throw new ForbiddenException("You cannot access this resource!");
@@ -115,15 +90,59 @@ public class SecuredEndpointInterceptor {
         return context.proceed();
     }
 
-    // --- Helpers ---
+    // ---------------- Helpers ----------------
+
+    private boolean matchesRule(List<Entitlement> entitlements,
+                                String rule,
+                                Map<String, String> pathParams,
+                                String securedEndpointId,
+                                Method method) {
+        try {
+            String resolvedRule = rule;
+
+            // 1️⃣ Resolve dynamic placeholders via resolvers
+            if (resolvedRule.contains("{")) {
+                resolvedRule = resolveRegex(securedEndpointId, method, resolvedRule);
+            }
+
+            // 2️⃣ Replace path parameters with actual values (escaped for regex)
+                for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+                    resolvedRule = resolvedRule.replace(
+                            "{" + entry.getKey() + "}",
+                            escapeRegexChars(entry.getValue())
+                    );
+                }
+
+            // 3️⃣ If no regex wildcards, escape rule for literal match
+//            if (!resolvedRule.contains(".*") && !resolvedRule.contains("^") && !resolvedRule.contains("$")) {
+//                resolvedRule = Pattern.quote(resolvedRule);
+//            }
+
+            Pattern pattern = Pattern.compile(resolvedRule);
+
+            // 4️⃣ Match against all entitlements
+            return entitlements.stream()
+                    .anyMatch(e ->
+
+                    pattern.matcher(e.getRaw()).find());
+
+
+        } catch (Exception ex) {
+            LOG.warn("Skipping rule due to exception: " + ex.getMessage());
+            return false;
+        }
+    }
+    private String escapeRegexChars(String value) {
+        // Escape only regex meta characters: . \ + * ? [ ^ ] $ ( ) { } = ! < > | : -
+        return value.replaceAll("([\\\\.+*?\\[\\]^$(){}=!<>|:-])", "\\\\$1");
+    }
     private String generateSecuredEndpointId(String httpMethod, String fullPath) {
-        var raw = httpMethod + fullPath;
         try {
             var digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest((httpMethod + fullPath).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate securedEndpointId hash", e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -143,69 +162,46 @@ public class SecuredEndpointInterceptor {
         String full = "";
         if (classPath != null) full += classPath.value();
         if (methodPath != null) full += methodPath.value();
-
         return normalizePath(full);
     }
 
     private String normalizePath(String path) {
-        // Ensure single leading slash and no double slashes
         if (!path.startsWith("/")) path = "/" + path;
-        path = path.replaceAll("//+", "/");
-        return path;
+        return path.replaceAll("//+", "/");
     }
 
     private String resolveRegex(String securedEndpointId, Method method, String regex) {
         SecuredEndpoint endpoint = method.getAnnotation(SecuredEndpoint.class);
         TestResolver[] resolverDefs = endpoint.resolvers();
 
-
+        String resolvedRule = regex;
         for (TestResolver resolverDef : resolverDefs) {
-
             Class<? extends TestGroupIdResolver> resolverClass = resolverDef.idResolver();
             String pathId = resolverDef.pathId();
 
             TestGroupIdResolver resolver = resolverInstances.select(resolverClass).get();
-
-            //String resolvedValue = resolver.resolve(pathId);
             List<EndpointMetadata> endpoints = endpointMetadataHolder.getData();
             String resource = endpoints.stream()
                     .filter(e -> e.getSecuredEndpointId().equals(securedEndpointId))
                     .findFirst()
-                    .map(e -> {
-                        String r = resolveResourceFromPath(e.getPath(), pathId);
-                        return r;
-                    })
+                    .map(e -> resolveResourceFromPath(e.getPath(), pathId))
                     .orElseThrow(() -> new IllegalStateException(
                             "No endpoint metadata found for securedEndpointId " + securedEndpointId));
 
-            String resolvedValue = resolver.resolve(securedEndpointId,resource, pathId);
-
-
-            var replacedRegex = regex.replace("{" + pathId + "}", resolvedValue);
-            return replacedRegex;
+            String resolvedValue = resolver.resolve(securedEndpointId, resource, pathId);
+            resolvedRule = resolvedRule.replace("{" + pathId + "}", resolvedValue);
         }
-        return regex;
+        return resolvedRule;
     }
 
     private String resolveResourceFromPath(String fullPath, String pathId) {
-
         String[] segments = fullPath.split("/");
-
         for (int i = 0; i < segments.length; i++) {
-
             if (segments[i].equals("{" + pathId + "}")) {
-
-                if (i == 0) {
-                    throw new IllegalStateException("Cannot resolve resource for " + pathId);
-                }
-
-                String resourceSegment = segments[i - 1];
-
-                // normalize: tenants -> Tenant
-                return capitalize(resourceSegment.replaceAll("s$", ""));
+                if (i == 0) throw new IllegalStateException("Cannot resolve resource for " + pathId);
+                return capitalize(segments[i - 1].replaceAll("s$", ""));
             }
         }
-
         throw new IllegalStateException("Path parameter {" + pathId + "} not found in path " + fullPath);
     }
 

@@ -16,9 +16,9 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     AgroalDataSource dataSource;
 
     @Override
-    public List<EndpointResolver> findAll() {
+    public List<EndpointResolver> findAllEndpointResolver() {
         String sql = "SELECT * FROM endpoint_resolver";
-        List<EndpointResolver> users = new ArrayList<>();
+        List<EndpointResolver> resolvers = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -28,7 +28,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
 
                 var ts = rs.getTimestamp("created_at");
                 var createdAt = ts.toLocalDateTime();
-                var user = new EndpointResolver(
+                var resolver = new EndpointResolver(
                         rs.getLong("id"),
                         rs.getString("secured_endpoint_id"),
                         rs.getString("resource"),
@@ -36,17 +36,77 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
                         rs.getString("mapped_field"),
                         createdAt
                 );
-                users.add(user);
+                resolvers.add(resolver);
             }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        return users;
+        return resolvers;
     }
+
+    public EndpointResolver findById(Long id) {
+        String sql = "SELECT * FROM endpoint_resolver WHERE id = ?";
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setLong(1, id);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    var ts = rs.getTimestamp("created_at");
+                    var createdAt = ts.toLocalDateTime();
+
+                    return new EndpointResolver(
+                            rs.getLong("id"),
+                            rs.getString("secured_endpoint_id"),
+                            rs.getString("resource"),
+                            rs.getString("original_field"),
+                            rs.getString("mapped_field"),
+                            createdAt
+                    );
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Error fetching ResourceAuthorization with id " + id, e);
+        }
+
+        return null; // or throw NotFoundException if you prefer
+    }
+
+    public void delete(Long id) {
+        String sql = "DELETE FROM endpoint_resolver WHERE id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void update(EndpointResolver re) {
+        String sql = "UPDATE endpoint_resolver SET original_field = ?, mapped_field = ? , created_at = ? WHERE id = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, re.getOriginalField());
+            ps.setString(2, re.getMappedField());
+            ps.setTimestamp(3,Timestamp.valueOf(re.getCreatedAt()));
+            ps.setLong(4, re.getId());
+
+            ps.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public List<EndpointResolver> list(String column, String value) {
-        Set<String> allowedColumns = Set.of("id", "resource","original_field","mapped_field", "secured_endpoint_id", "created_at");
+        Set<String> allowedColumns = Set.of("id", "resource", "original_field", "mapped_field", "secured_endpoint_id", "created_at");
         if (!allowedColumns.contains(column)) {
             throw new IllegalArgumentException("Invalid column: " + column);
         }
@@ -112,7 +172,6 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
             ps.setString(4, entity.getMappedField());
 
             ps.executeUpdate();
-
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -58,8 +58,7 @@ public class EndpointRecorder {
     }
 
     public void initSchema() {
-
-        var schemaInitializer = Arc.container().select(SchemaInitializer.class);
+      var schemaInitializer = Arc.container().select(SchemaInitializer.class);
 
         if (schemaInitializer.getHandle().getBean().isActive()) {
 

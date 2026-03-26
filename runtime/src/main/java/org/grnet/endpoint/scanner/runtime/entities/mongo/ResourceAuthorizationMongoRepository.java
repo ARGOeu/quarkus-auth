@@ -24,13 +24,17 @@ public class ResourceAuthorizationMongoRepository implements ResourceAuthorizati
     String database;
 
 
+//    @Override
+//    public List<ResourceAuthorization> findAll() {
+//
+//        return getCollectionByClass(ResourceAuthorization.class)
+//                .find()
+//                .into(new ArrayList<>());
     @Override
-    public List<ResourceAuthorization> findAll() {
-
-        return getCollectionByClass(ResourceAuthorization.class)
-                .find()
-                .into(new ArrayList<>());
+    public List<ResourceAuthorization> findAllResourceAuthorization() {
+        return List.of();
     }
+
 
     @Override
     public List<ResourceAuthorization> list(String column, String id) {
@@ -49,8 +53,18 @@ public class ResourceAuthorizationMongoRepository implements ResourceAuthorizati
         return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName(), clazz);
     }
 
-    private MongoCollection<Document> getCollection(Class<?> clazz){
+    private MongoCollection<Document> getCollection(Class<?> clazz) {
         return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName());
+    }
+    public void delete(Long id) {
+    }
+
+
+    public void update(ResourceAuthorization entity) {
+    }
+
+    public ResourceAuthorization findById(Long id) {
+        return  null;
     }
 }
 

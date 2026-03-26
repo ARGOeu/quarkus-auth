@@ -35,7 +35,6 @@ public class SchemaInitializer {
             var dbKind = ConfigProvider.getConfig().getValue("quarkus.datasource.db-kind", String.class);
 
             if(DatabaseKind.isPostgreSQL(dbKind)){
-
                 LOG.info("Secured Endpoints extension: Creating tables for PostgreSQL...");
 
                 try (Connection conn = ds.get().getConnection(); var reader = new InputStreamReader(Objects.requireNonNull(getClass().getResourceAsStream("/db/postgresql/init.sql")))) {
@@ -58,6 +57,17 @@ public class SchemaInitializer {
         } else {
             LOG.info("No JDBC data source found...");
             throw new RuntimeException("No JDBC data source found...");
+        }
+    }
+
+    private String generateSecuredEndpointId(EndpointMetadata endpoint) {
+        String raw = endpoint.getAction() + endpoint.getPath();
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to generate securedEndpointId hash", e);
         }
     }
 }

@@ -231,7 +231,7 @@ class EndpointScannerProcessor {
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
+        AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
                 AdditionalBeanBuildItem.unremovableOf(RepositoryRegistry.class),
                 AdditionalBeanBuildItem.unremovableOf(DynamicResolver.class),
@@ -289,6 +289,24 @@ class EndpointScannerProcessor {
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
         syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
     }
+//
+//    @BuildStep
+//    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
+//
+//        Class<?> implementation;
+//
+//        if (!jdbcDataSourceBuildItems.isEmpty()) {
+//            implementation = ResourceAuthorizationJdbcRepository.class;
+//        } else {
+//            implementation = ResourceAuthorizationMongoRepository.class;
+//        }
+//
+//        return AdditionalBeanBuildItem
+//                .builder()
+//                .addBeanClass(implementation)
+//                .setUnremovable()
+//                .build();
+//    }
 
     @BuildStep
     List<AdditionalBeanBuildItem> selectBeans(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
@@ -409,4 +427,17 @@ class EndpointScannerProcessor {
         }
         return result;
     }
+
+//    @BuildStep
+//    void registerRepositories(CombinedIndexBuildItem combinedIndex,
+//                              BuildProducer<AdditionalBeanBuildItem> beans) {
+//
+//        var repoInterface = DotName.createSimple(
+//                "io.quarkus.hibernate.orm.panache.PanacheRepositoryBase"
+//        );
+//
+//        for (var repo : combinedIndex.getIndex().getAllKnownImplementors(repoInterface)) {
+//            beans.produce(AdditionalBeanBuildItem.unremovableOf(repo.name().toString()));
+//        }
+//    }
 }

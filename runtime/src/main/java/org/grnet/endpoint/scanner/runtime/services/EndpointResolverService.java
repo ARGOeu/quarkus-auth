@@ -18,8 +18,24 @@ public class EndpointResolverService {
     public List<EndpointResolver> findAllEndpointResolverByEndpoint(String id) {
 
         return endpointResolverRepository.list("secured_endpoint_id",id);
-        //     return EndpointResolver.findBySecuredEndpointId(id);
     }
+    public List<EndpointResolver> findAllEndpointResolver() {
+        return endpointResolverRepository.findAllEndpointResolver();
+    }
+    public void delete(Long id) {
+        endpointResolverRepository.delete(id);
+    }
+    public List<EndpointResolver> findByEndpointsecuredEndpointId(String securedEndpointId) {
+        return endpointResolverRepository.list("secured_endpoint_id", securedEndpointId);
+    }
+    public EndpointResolver findById(Long id) {
+        return endpointResolverRepository.findById(id);
+    }
+
+    public void update(EndpointResolver endpointResolver) {
+        endpointResolverRepository.update(endpointResolver);
+    }
+
 
     public void addResolvedField(EndpointResolver endpointResolver) {
         endpointResolverRepository.create(endpointResolver);

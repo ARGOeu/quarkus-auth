@@ -24,11 +24,13 @@ public class EndpointResolverMongoRepository implements EndpointResolverReposito
     String database;
 
 
-    @Override
-    public List<EndpointResolver> findAll() {
-        return getCollectionByClass(EndpointResolver.class)
-                .find()
-                .into(new ArrayList<>());
+//    @Override
+//    public List<EndpointResolver> findAll() {
+//        return getCollectionByClass(EndpointResolver.class)
+//                .find()
+//                .into(new ArrayList<>());
+    public List<EndpointResolver> findAllEndpointResolver() {
+        return List.of();
     }
 
     @Override
@@ -50,6 +52,19 @@ public class EndpointResolverMongoRepository implements EndpointResolverReposito
 
     private MongoCollection<Document> getCollection(Class<?> clazz){
         return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName());
+    }
+    @Override
+    public void delete(Long id) {
+    }
+
+
+    @Override
+    public void update(EndpointResolver entity) {
+    }
+
+    @Override
+    public EndpointResolver findById(Long id) {
+        return  null;
     }
 }
 

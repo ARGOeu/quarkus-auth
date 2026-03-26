@@ -28,8 +28,11 @@ import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
 
@@ -155,7 +158,7 @@ public class SecuredEndpointResource {
             resourceAuthorizationService.authorize(re);
         }
 
-        return resourceAuthorizationService.findAll();
+        return resourceAuthorizationService.findAllResourcesAuthorization();
     }
 
     @Tag(name = "Secured Endpoints")
@@ -282,9 +285,357 @@ public class SecuredEndpointResource {
             this.content = content;
         }
     }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Get authorization resource rules for a secured enpoint",
+            description = "CGet authorization resource rules"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "List of authorization resource rules",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.ARRAY,
+                    implementation = ResourceAuthorization.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Rule already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @GET
+    @Path("/{secured-endpoint-id}/resource-authorizations")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public List<ResourceAuthorization> getResourceAuthorizationList(
+            @PathParam("secured-endpoint-id") String id) {
+        return resourceAuthorizationService.findAllResourcesAuthorization();
+    }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Get a specific resource authorization  rule by id",
+            description = "Get resource authorization rule"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Resource authorization rule",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = ResourceAuthorization.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Rule already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+
+
+    @GET
+    @Path("/resource-authorizations/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public ResourceAuthorization getResourceAuthorizationById(
+            @PathParam("id") Long id) {
+        return resourceAuthorizationService.findById(id);
+    }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Get resolved fields for a secured endpoint",
+            description = "Get resolved fields for a secured endpoint"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "List of resolved fields",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.ARRAY,
+                    implementation = ResourceAuthorization.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Resolved field already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @GET
+    @Path("/{secured-endpoint-id}/resolved")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+
+    public List<EndpointResolver> getSecuredEndpointResolvedList(
+            @PathParam("secured-endpoint-id") String id) {
+        return endpointResolverService.findAllEndpointResolver();
+    }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Update resolved field for or a secured endpoint",
+            description = "Update resolved field for or a secured endpoint"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Successfully updated rules",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Rule already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @PUT
+    @Path("/endpoint-resolver/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+    public EndpointResolver updateEndpointResolver(
+            @PathParam("id") Long id,
+            EndpointResolverRequest request) {
+
+        // 1️⃣ Fetch existing record
+        EndpointResolver existing = endpointResolverService.findById(id);
+        if (existing == null) {
+            throw new NotFoundException("ResourceAuthorization with id " + id + " not found");
+        }
+
+        // 2️⃣ Update the rule
+        existing.setResource(request.resource);
+        existing.setOriginalField(request.original_field);
+        existing.setMappedField(request.mapped_field);
+        existing.setCreatedAt(LocalDateTime.now()); // optionally update timestamp
+
+        // 3️⃣ Persist
+        endpointResolverService.update(existing);
+
+        return existing;
+    }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Delete resolved fields for secured endpoint",
+            description = "Delete resolved field"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Successfully deleted resolver",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Resolved field already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+
+
+    @DELETE
+    @Path("/endpoint-resolver/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+    public Response deleteEndpointResolver(@PathParam("id") Long id) {
+
+        EndpointResolver existing = endpointResolverService.findById(id);
+        if (existing == null) {
+            throw new NotFoundException("ResourceAuthorization with id " + id + " not found");
+        }
+
+        endpointResolverService.delete(id);
+        return Response.ok(Map.of("message", "Successfully deleted")).build();
+    }
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Get a specific resolved field  by id",
+            description = "Get a specific resolved field"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Resolved field rule",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = ResourceAuthorization.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Rule already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @GET
+    @Path("/endpoint-resolved/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+
+    public EndpointResolver getEndpointResolverById(
+            @PathParam("id") Long id) {
+        return endpointResolverService.findById(id);
+    }
+
+
+    @Tag(name = "Secured Endpoints")
+    @Operation(
+            summary = "Delete authorization resource rules for a secured enpoint",
+            description = "Delete authorization resource rules"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Successfully deleted rule",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Rule already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+
+
+    @DELETE
+    @Path("/resource-authorizations/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+
+    public Response deleteAuthorization(@PathParam("id") Long id) {
+
+        ResourceAuthorization existing = resourceAuthorizationService.findById(id);
+        if (existing == null) {
+            throw new NotFoundException("ResourceAuthorization with id " + id + " not found");
+        }
+
+        resourceAuthorizationService.delete(id);
+
+        return Response.ok(Map.of("message", "Successfully deleted")).build();
+    }
 }
-
-
-
 
 
