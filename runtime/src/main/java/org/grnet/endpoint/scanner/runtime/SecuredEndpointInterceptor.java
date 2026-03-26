@@ -1,7 +1,5 @@
 package org.grnet.endpoint.scanner.runtime;
 
-//import io.quarkus.logging.Log;
-
 import jakarta.annotation.Priority;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -69,9 +67,8 @@ public class SecuredEndpointInterceptor {
         String securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
 
         // 4️⃣ Retrieve ResourceAuthorization from DB
-        var authList = resourceAuthorizationService.findByEndpointsecuredEndpointId(securedEndpointId);
+        var authList = resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
         if (authList.isEmpty()) {
-           // Log.warn("No ResourceAuthorization found for securedEndpointId: " + securedEndpointId);
             throw new ForbiddenException("You cannot access this resource!");
         }
 

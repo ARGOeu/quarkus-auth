@@ -68,7 +68,7 @@ public class ResourceAuthorizationService {
 
         repository.create(re);
     }
-    public List<ResourceAuthorization> findByEndpointsecuredEndpointId(String securedEndpointId) {
+    public List<ResourceAuthorization> findByEndpointSecuredEndpointId(String securedEndpointId) {
         return repository.list("secured_endpoint_id", securedEndpointId);
     }
 
