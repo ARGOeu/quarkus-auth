@@ -16,6 +16,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
+import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadata;
+import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageLink;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
 import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
@@ -56,10 +58,14 @@ import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
+import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
+import org.jboss.jandex.IndexView;
+import org.jboss.jandex.MethodInfo;
 import org.jboss.logging.Logger;
 
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -68,6 +74,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 
@@ -103,6 +110,7 @@ class EndpointScannerProcessor {
         var securedAnnotation = DotName.createSimple(
                 "org.grnet.endpoint.scanner.runtime.SecuredEndpoint"
         );
+
 
         for (AnnotationInstance annotation : index.getAnnotations(securedAnnotation)) {
 
@@ -240,8 +248,9 @@ class EndpointScannerProcessor {
 
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
+                AdditionalBeanBuildItem.unremovableOf(ResourceRepositoryMetadataHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
-        AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
+                AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
                 AdditionalBeanBuildItem.unremovableOf(RepositoryRegistry.class),
                 AdditionalBeanBuildItem.unremovableOf(DynamicResolver.class),
@@ -389,9 +398,150 @@ class EndpointScannerProcessor {
 
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
-    void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, BuildProducer<BeanContainerListenerBuildItem> listeners) {
+    ResourceRepositoryMetadataBuildItem processRepositories(EndpointRecorder recorder, CombinedIndexBuildItem indexBuildItem) {
+
+        LOG.info("Process resource repositories...");
+
+        var index = indexBuildItem.getIndex();
+
+        var resourceRepository = DotName.createSimple(
+                "org.grnet.endpoint.scanner.runtime.entities.ResourceRepository"
+        );
+
+        var list = new ArrayList<ResourceRepositoryMetadata>();
+
+        var usedClassNames = new HashSet<>();
+        var usedValues = new HashSet<>();
+
+
+        for (AnnotationInstance annotation : index.getAnnotations(resourceRepository)) {
+
+            if (annotation.target().kind() != AnnotationTarget.Kind.CLASS) {
+                LOG.warn("@ResourceRepository must be on a class, found on: " + annotation.target().kind());
+                continue;
+            }
+
+            // Get the target of the annotation (the class it's applied to)
+            var classInfo = annotation.target().asClass();
+
+            if (!isCdiBean(classInfo)) {
+                throw new IllegalStateException(
+                        "Class " + classInfo.name() + " annotated with @ResourceRepository " +
+                                "must be a CDI bean. Please annotate it with a scope " +
+                                "e.g. @ApplicationScoped, @RequestScoped, @Dependent etc."
+                );
+            }
+
+            var findByIdMethod = Optional.ofNullable(
+                            findMethodInHierarchy(index, classInfo, "findById"))
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Class " + classInfo.name() + " annotated with @ResourceRepository " +
+                                    "must declare a 'findById' method."
+                    ));
+
+            LOG.info("Found method: " + findByIdMethod.name() + " in " + classInfo.name());
+
+            // Get the fully qualified class name
+            var className = classInfo.name();
+            LOG.info("Annotation found on class: " + className.toString());
+
+            // You can also get the annotation value
+            var value = annotation.value().asString();
+            LOG.info("Annotation value: " + value);
+
+            if (usedClassNames.contains(className.toString()) || usedValues.contains(value)) {
+                throw new IllegalArgumentException("Duplicate resource repository detected: value=%s".formatted(value));
+            }
+
+            var metadata = new ResourceRepositoryMetadata(className.toString(), value);
+
+            usedClassNames.add(className.toString());
+            usedValues.add(value);
+            list.add(metadata);
+        }
+
+        var metadata = recorder.storeResourceRepositoryMetadata(list);
+
+        return new ResourceRepositoryMetadataBuildItem(metadata);
+    }
+
+    private boolean isCdiBean(ClassInfo classInfo) {
+
+        // CDI Scope annotations
+       var cdiScopes = List.of(
+                DotName.createSimple("jakarta.enterprise.context.ApplicationScoped"),
+                DotName.createSimple("jakarta.enterprise.context.RequestScoped"),
+                DotName.createSimple("jakarta.enterprise.context.SessionScoped"),
+                DotName.createSimple("jakarta.enterprise.context.Dependent"),
+                DotName.createSimple("jakarta.inject.Singleton"),
+                DotName.createSimple("io.quarkus.arc.DefaultBean")
+        );
+
+        return classInfo
+                .declaredAnnotations()
+                .stream()
+                .map(AnnotationInstance::name)
+                .anyMatch(cdiScopes::contains);
+    }
+
+
+    private MethodInfo findMethodInHierarchy(IndexView index, ClassInfo classInfo, String methodName) {
+
+        var current = classInfo;
+
+        while (current != null) {
+
+            // Check declared methods of current class
+            var method = current.methods()
+                    .stream()
+                    .filter(m -> m.name().equals(methodName))
+                    .findFirst();
+
+            if (method.isPresent()) {
+                return method.get();
+            }
+
+            // Check all implemented interfaces (default and static methods)
+            for (var interfaceName : current.interfaceNames()) {
+                var interfaceInfo = index.getClassByName(interfaceName);
+                if (interfaceInfo != null) {
+
+                    var interfaceMethod = interfaceInfo.methods()
+                            .stream()
+                            .filter(m -> m.name().equals(methodName))
+                            .filter(m -> !Modifier.isAbstract(m.flags()))  // default + static
+                            .findFirst();
+
+                    if (interfaceMethod.isPresent()) {
+                        return interfaceMethod.get();
+                    }
+
+                    // Recursively check parent interfaces
+                    var parentInterfaceMethod = findMethodInHierarchy(index, interfaceInfo, methodName);
+                    if (parentInterfaceMethod != null) {
+                        return parentInterfaceMethod;
+                    }
+                }
+            }
+
+            // Walk up to superclass
+            var superName = current.superName();
+            if (superName == null || superName.toString().equals("java.lang.Object")) {
+                break;
+            }
+
+            current = index.getClassByName(superName);
+        }
+
+        return null;
+    }
+
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, ResourceRepositoryMetadataBuildItem repos, BuildProducer<BeanContainerListenerBuildItem> listeners) {
 
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
+        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureResourceRepositoryBeanContainer(repos.getRepositories())));
     }
 
     @BuildStep

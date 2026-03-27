@@ -80,9 +80,20 @@ public class EndpointRecorder {
         return new RuntimeValue<>(data);
     }
 
+    public RuntimeValue<List<ResourceRepositoryMetadata>> storeResourceRepositoryMetadata(List<ResourceRepositoryMetadata> data) {
+        return new RuntimeValue<>(data);
+    }
+
     public BeanContainerListener configureBeanContainer(RuntimeValue<List<EndpointMetadata>> metadata) {
         return beanContainer -> {
             var bean = beanContainer.beanInstance(EndpointMetadataHolder.class);
+            bean.setData(metadata.getValue());
+        };
+    }
+
+    public BeanContainerListener configureResourceRepositoryBeanContainer(RuntimeValue<List<ResourceRepositoryMetadata>> metadata) {
+        return beanContainer -> {
+            var bean = beanContainer.beanInstance(ResourceRepositoryMetadataHolder.class);
             bean.setData(metadata.getValue());
         };
     }
