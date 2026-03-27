@@ -16,7 +16,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     AgroalDataSource dataSource;
 
     @Override
-    public List<EndpointResolver> findAllEndpointResolver() {
+    public List<EndpointResolver> findAll() {
         String sql = "SELECT * FROM endpoint_resolver";
         List<EndpointResolver> resolvers = new ArrayList<>();
 

@@ -3,6 +3,8 @@ package org.grnet.endpoint.scanner.runtime.entities.mongo;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import jakarta.inject.Inject;
 import org.bson.Document;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -24,15 +26,9 @@ public class ResourceAuthorizationMongoRepository implements ResourceAuthorizati
     String database;
 
 
-//    @Override
-//    public List<ResourceAuthorization> findAll() {
-//
-//        return getCollectionByClass(ResourceAuthorization.class)
-//                .find()
-//                .into(new ArrayList<>());
     @Override
-    public List<ResourceAuthorization> findAllResourceAuthorization() {
-        return List.of();
+    public List<ResourceAuthorization> findAll() {
+        return getCollectionByClass(ResourceAuthorization.class).find().into(new ArrayList<>());
     }
 
 
@@ -49,22 +45,34 @@ public class ResourceAuthorizationMongoRepository implements ResourceAuthorizati
         getCollectionByClass(ResourceAuthorization.class).insertOne(entity);
     }
 
+    @Override
+    public void delete(Long id) {
+        getCollectionByClass(ResourceAuthorization.class).deleteOne(eq("_id", id));
+    }
+
+    @Override
+    public void update(Long id, String rule) {
+
+        getCollectionByClass(ResourceAuthorization.class).updateOne(
+                Filters.eq("_id", id),
+                Updates.set("rule", rule)
+        );
+    }
+
+    @Override
+    public ResourceAuthorization findById(Long id) {
+        return getCollectionByClass(ResourceAuthorization.class)
+                .find(and(
+                        eq("_id", id)
+                )).first();
+    }
+
     private <T> MongoCollection<T> getCollectionByClass(Class<T> clazz){
         return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName(), clazz);
     }
 
     private MongoCollection<Document> getCollection(Class<?> clazz) {
         return mongoClient.getDatabase(database).getCollection(clazz.getSimpleName());
-    }
-    public void delete(Long id) {
-    }
-
-
-    public void update(ResourceAuthorization entity) {
-    }
-
-    public ResourceAuthorization findById(Long id) {
-        return  null;
     }
 }
 

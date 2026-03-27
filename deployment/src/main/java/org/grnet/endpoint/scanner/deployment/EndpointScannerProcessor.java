@@ -29,7 +29,6 @@ import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Acto
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Setting;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.PersistenceEntitlementMongoRepository;
-import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongo;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
@@ -183,6 +182,16 @@ class EndpointScannerProcessor {
                     "Duplicate endpoint detected: action=%s, path=%s"
                             .formatted(endpoint.getAction(), endpoint.getPath()));
         }
+
+        endpoints
+                .stream()
+                .map(EndpointMetadata::getSecuredEndpointId)
+                .filter(hashed->hashed.equals(endpoint.getSecuredEndpointId()))
+                .findAny()
+                .ifPresent(val -> {
+            throw new IllegalArgumentException("Duplicate hashed secured endpoint id detected: " + val);
+        });
+
         endpoints.add(endpoint);
     }
 
@@ -203,7 +212,8 @@ class EndpointScannerProcessor {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(SecuredEndpointResource.class));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.class.getName()));
-        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorizationMongo.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorization.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EndpointResolver.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlements.class.getName()));
@@ -238,8 +248,7 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(ResolverConfigService.class),
                 AdditionalBeanBuildItem.unremovableOf(GroupIdResolver.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(EndpointResolver.class));
+                AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class));
     }
 
     @BuildStep
@@ -289,24 +298,6 @@ class EndpointScannerProcessor {
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
         syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
     }
-//
-//    @BuildStep
-//    AdditionalBeanBuildItem selectRepository(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
-//
-//        Class<?> implementation;
-//
-//        if (!jdbcDataSourceBuildItems.isEmpty()) {
-//            implementation = ResourceAuthorizationJdbcRepository.class;
-//        } else {
-//            implementation = ResourceAuthorizationMongoRepository.class;
-//        }
-//
-//        return AdditionalBeanBuildItem
-//                .builder()
-//                .addBeanClass(implementation)
-//                .setUnremovable()
-//                .build();
-//    }
 
     @BuildStep
     List<AdditionalBeanBuildItem> selectBeans(List<JdbcDataSourceBuildItem> jdbcDataSourceBuildItems) {
@@ -404,12 +395,9 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    void markResourceRepositoriesUnremovable(
-            CombinedIndexBuildItem index,
-            BuildProducer<UnremovableBeanBuildItem> unremovableBeans) {
+    void markResourceRepositoriesUnremovable(CombinedIndexBuildItem index, BuildProducer<UnremovableBeanBuildItem> unremovableBeans) {
 
-        // Use the annotation class directly (works across modules)
-        DotName annotation = DotName.createSimple(ResourceRepository.class.getName());
+        var annotation = DotName.createSimple(ResourceRepository.class.getName());
 
         index.getIndex().getAnnotations(annotation).forEach(a -> {
             var target = a.target();
@@ -427,17 +415,4 @@ class EndpointScannerProcessor {
         }
         return result;
     }
-
-//    @BuildStep
-//    void registerRepositories(CombinedIndexBuildItem combinedIndex,
-//                              BuildProducer<AdditionalBeanBuildItem> beans) {
-//
-//        var repoInterface = DotName.createSimple(
-//                "io.quarkus.hibernate.orm.panache.PanacheRepositoryBase"
-//        );
-//
-//        for (var repo : combinedIndex.getIndex().getAllKnownImplementors(repoInterface)) {
-//            beans.produce(AdditionalBeanBuildItem.unremovableOf(repo.name().toString()));
-//        }
-//    }
 }

@@ -20,7 +20,7 @@ public class EndpointResolverService {
         return endpointResolverRepository.list("secured_endpoint_id",id);
     }
     public List<EndpointResolver> findAllEndpointResolver() {
-        return endpointResolverRepository.findAllEndpointResolver();
+        return endpointResolverRepository.findAll();
     }
     public void delete(Long id) {
         endpointResolverRepository.delete(id);
@@ -36,13 +36,7 @@ public class EndpointResolverService {
         endpointResolverRepository.update(endpointResolver);
     }
 
-
     public void addResolvedField(EndpointResolver endpointResolver) {
         endpointResolverRepository.create(endpointResolver);
     }
-
-    @Transactional
-    public void updateAuthorizations(String endpointId, List<String> requestedRules) {
-    }
-
 }

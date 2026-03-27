@@ -68,23 +68,18 @@ public class ResourceAuthorizationService {
     }
 
     public List<ResourceAuthorization> findAllResourcesAuthorization() {
-        return repository.findAllResourceAuthorization();
+        return repository.findAll();
     }
     public void delete(Long id) {
         repository.delete(id);
     }
 
-
     public ResourceAuthorization findById(Long id) {
         return repository.findById(id);
     }
 
-    public void update(ResourceAuthorization resourceAuthorization) {
-     repository.update(resourceAuthorization);
+    public void updateRule(Long id, String rule) {
+
+        repository.update(id, rule);
     }
-
-    public void updateAuthorizations(String endpointId, List<String> requestedRules) {
-    }
-
-
 }
