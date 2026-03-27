@@ -1,65 +1,56 @@
 package org.grnet.endpoint.scanner.runtime.resolvers;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
-import jakarta.enterprise.inject.Instance;
+import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
-import org.grnet.endpoint.scanner.runtime.RepositoryRegistrar;
+import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadata;
+import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadataHolder;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import java.util.Optional;
 
 
 @ApplicationScoped
 public class RepositoryRegistry {
 
-
-    // Inject all beans in the container
     @Inject
-    @Any
-    Instance<Object> beans;
-
-    private final Map<String, Object> repoMap = new HashMap<>();
-    @Inject
-    @Any
-    Instance<RepositoryRegistrar> registrars;
-
-    @PostConstruct
-    void init() {
-        registrars.forEach(r -> r.registerRepositories(this));
-    }
-
-    public void register(String key, Object repository) {
-        if (repoMap.containsKey(key)) {
-            throw new IllegalStateException("Duplicate repository for key: " + key);
-        }
-        repoMap.put(key, repository);
-      }
-
-    public Object getRepository(String resource) {
-        Object repo = repoMap.get(resource);
-
-
-        if (repo == null) {
-            throw new IllegalStateException(
-                    "No repository configured for resource: " + resource);
-        }
-
-        return repo;
-    }
+    ResourceRepositoryMetadataHolder resourceRepositoryMetadataHolder;
 
     public Object findEntity(String resource, Object id) {
 
-        Object repo = getRepository(resource);
+        return findByResource(resource, resourceRepositoryMetadataHolder.getData())
+                .map(r -> {
+                    try {
+                        Class<?> clazz = Thread.currentThread()
+                                .getContextClassLoader()
+                                .loadClass(r.getClassName());
 
-        try {
-            Method method = repo.getClass().getMethod("findById", Object.class);
-            return method.invoke(repo, id);
+                        Object repo = CDI.current()
+                                .select(clazz, Any.Literal.INSTANCE)
+                                .get();
+//                        Object repo = CDI.current()
+//                                .select(clazz)
+//                                .get();
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+                        Method method = clazz.getMethod("findById", Object.class);
+
+                        return method.invoke(repo, id);
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .orElseThrow(() -> new RuntimeException("Resource not found: " + resource));
+    }
+
+    public Optional<ResourceRepositoryMetadata> findByResource(
+            String resource,
+            List<ResourceRepositoryMetadata> data) {
+
+        return data.stream()
+                .filter(item -> item.getValue().equalsIgnoreCase(resource))
+                .findFirst();
     }
 }
