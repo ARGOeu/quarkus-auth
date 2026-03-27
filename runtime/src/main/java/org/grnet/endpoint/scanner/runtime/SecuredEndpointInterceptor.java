@@ -9,7 +9,6 @@ import jakarta.interceptor.InvocationContext;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Path;
-import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.UriInfo;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
@@ -49,6 +48,9 @@ public class SecuredEndpointInterceptor {
     @Inject
     SecuredEndpointConfig config;
 
+    @Inject
+    ResourceRepositoryMetadataHolder resourceRepositoryMetadataHolder;
+
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
 
     @AroundInvoke
@@ -60,11 +62,11 @@ public class SecuredEndpointInterceptor {
             return context.proceed();
         }
 
-        Method method = context.getMethod();
-        String httpMethod = getHttpMethod(method);
-        String fullPath = buildFullPath(context, method);
+        var method = context.getMethod();
+        var httpMethod = getHttpMethod(method);
+        var fullPath = buildFullPath(context, method);
 
-        String securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
+        var securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
 
         var authList = resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
         if (authList.isEmpty()) {
@@ -72,7 +74,7 @@ public class SecuredEndpointInterceptor {
         }
 
         // Map of request path params
-        Map<String, String> pathParams = uriInfo.getPathParameters()
+        var pathParams = uriInfo.getPathParameters()
                 .entrySet()
                 .stream()
                 .collect(Collectors.toMap(
@@ -98,7 +100,7 @@ public class SecuredEndpointInterceptor {
                                 String securedEndpointId,
                                 Method method) {
         try {
-            String resolvedRule = rule;
+            var resolvedRule = rule;
 
             // 1️⃣ Resolve dynamic placeholders via resolvers
             if (resolvedRule.contains("{")) {
@@ -118,7 +120,7 @@ public class SecuredEndpointInterceptor {
 //                resolvedRule = Pattern.quote(resolvedRule);
 //            }
 
-            Pattern pattern = Pattern.compile(resolvedRule);
+            var pattern = Pattern.compile(resolvedRule);
 
             // 4️⃣ Match against all entitlements
             return entitlements.stream()
@@ -147,7 +149,7 @@ public class SecuredEndpointInterceptor {
     }
 
     private String getHttpMethod(Method method) {
-        for (Annotation annotation : method.getAnnotations()) {
+        for (var annotation : method.getAnnotations()) {
             if (annotation.annotationType().isAnnotationPresent(HttpMethod.class)) {
                 return annotation.annotationType().getAnnotation(HttpMethod.class).value();
             }
@@ -156,10 +158,10 @@ public class SecuredEndpointInterceptor {
     }
 
     private String buildFullPath(InvocationContext context, Method method) {
-        Path classPath = method.getDeclaringClass().getAnnotation(Path.class);
-        Path methodPath = method.getAnnotation(Path.class);
+        var classPath = method.getDeclaringClass().getAnnotation(Path.class);
+        var methodPath = method.getAnnotation(Path.class);
 
-        String full = "";
+        var full = "";
         if (classPath != null) full += classPath.value();
         if (methodPath != null) full += methodPath.value();
         return normalizePath(full);
@@ -171,10 +173,10 @@ public class SecuredEndpointInterceptor {
     }
 
     private String resolveRegex(String securedEndpointId, Method method, String regex) {
-        SecuredEndpoint endpoint = method.getAnnotation(SecuredEndpoint.class);
-        TestResolver[] resolverDefs = endpoint.resolvers();
+        var endpoint = method.getAnnotation(SecuredEndpoint.class);
+        var resolverDefs = endpoint.resolvers();
 
-        String resolvedRule = regex;
+        var resolvedRule = regex;
         for (TestResolver resolverDef : resolverDefs) {
             Class<? extends TestGroupIdResolver> resolverClass = resolverDef.idResolver();
             String pathId = resolverDef.pathId();
@@ -195,7 +197,7 @@ public class SecuredEndpointInterceptor {
     }
 
     private String resolveResourceFromPath(String fullPath, String pathId) {
-        String[] segments = fullPath.split("/");
+        var segments = fullPath.split("/");
         for (int i = 0; i < segments.length; i++) {
             if (segments[i].equals("{" + pathId + "}")) {
                 if (i == 0) throw new IllegalStateException("Cannot resolve resource for " + pathId);
