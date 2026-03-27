@@ -6,9 +6,8 @@ public interface ResourceAuthorizationRepository {
 
     List<ResourceAuthorization> list(String column, String value);
     void  create(ResourceAuthorization entity);
-    List<ResourceAuthorization> findAllResourceAuthorization();
+    List<ResourceAuthorization> findAll();
     ResourceAuthorization findById(Long id);
-    void update(ResourceAuthorization entity);
+    void update(Long id, String rule);
     void delete(Long id);
-
 }

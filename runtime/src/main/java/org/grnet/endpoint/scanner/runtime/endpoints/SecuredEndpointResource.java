@@ -28,10 +28,8 @@ import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
@@ -137,7 +135,7 @@ public class SecuredEndpointResource {
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
     @POST
-    @Path("/{secured-endpoint-id}/authorizations")
+    @Path("/{secured-endpoint-id}/rules")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
@@ -197,20 +195,19 @@ public class SecuredEndpointResource {
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
     @PUT
-    @Path("/{secured-endpoint-id}/authorizations")
+    @Path("/rules/{id}")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-    public List<ResourceAuthorization> updateAuthorizations(@Parameter(
-            description = "The unique secured endpoint id.",
+    public Response updateAuthorizations(@Parameter(
+            description = "The unique rule id.",
             required = true,
-            example = "d9ae97f603809444ad911be3b30596462003d11bb06e928ac005bf4b1bb8c4a9",
-            schema = @Schema(type = SchemaType.STRING)) @PathParam("secured-endpoint-id") String securedEndpointId,
-            @Valid @NotNull(message = "The request body is empty.") AuthorizationRequest request) {
+            example = "1",
+            schema = @Schema(type = SchemaType.NUMBER)) @PathParam("id") Long ruleId,
+            @Valid @NotNull(message = "The request body is empty.") UpdateAuthorizationRequest request) {
 
-        resourceAuthorizationService.updateAuthorizations(securedEndpointId, request.rules);
-
-        return resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
+        resourceAuthorizationService.updateRule(ruleId, request.rule);
+        return Response.ok().build();
     }
 
     @Tag(name = "Secured Endpoints")
@@ -269,21 +266,6 @@ public class SecuredEndpointResource {
         endpointResolverService.addResolvedField(e);
 
         return endpointResolverService.findAllEndpointResolverByEndpoint(id);
-    }
-
-    public static class PageableSecuredEndpoints extends PageResource<EndpointMetadata> {
-
-        private List<EndpointMetadata> content;
-
-        @Override
-        public List<EndpointMetadata> getContent() {
-            return content;
-        }
-
-        @Override
-        public void setContent(List<EndpointMetadata> content) {
-            this.content = content;
-        }
     }
 
     @Tag(name = "Secured Endpoints")
@@ -365,8 +347,6 @@ public class SecuredEndpointResource {
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
-
-
     @GET
     @Path("/resource-authorizations/{id}")
     @Produces(MediaType.APPLICATION_JSON)
@@ -416,7 +396,6 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-
     public List<EndpointResolver> getSecuredEndpointResolvedList(
             @PathParam("secured-endpoint-id") String id) {
         return endpointResolverService.findAllEndpointResolver();
@@ -466,19 +445,16 @@ public class SecuredEndpointResource {
             @PathParam("id") Long id,
             EndpointResolverRequest request) {
 
-        // 1️⃣ Fetch existing record
-        EndpointResolver existing = endpointResolverService.findById(id);
+        var existing = endpointResolverService.findById(id);
         if (existing == null) {
             throw new NotFoundException("ResourceAuthorization with id " + id + " not found");
         }
 
-        // 2️⃣ Update the rule
         existing.setResource(request.resource);
         existing.setOriginalField(request.original_field);
         existing.setMappedField(request.mapped_field);
-        existing.setCreatedAt(LocalDateTime.now()); // optionally update timestamp
+        existing.setCreatedAt(LocalDateTime.now());
 
-        // 3️⃣ Persist
         endpointResolverService.update(existing);
 
         return existing;
@@ -519,8 +495,6 @@ public class SecuredEndpointResource {
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
-
-
     @DELETE
     @Path("/endpoint-resolver/{id}")
     @Produces(MediaType.APPLICATION_JSON)
@@ -576,7 +550,6 @@ public class SecuredEndpointResource {
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-
     public EndpointResolver getEndpointResolverById(
             @PathParam("id") Long id) {
         return endpointResolverService.findById(id);
@@ -618,13 +591,10 @@ public class SecuredEndpointResource {
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
-
-
     @DELETE
     @Path("/resource-authorizations/{id}")
     @Produces(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-
     public Response deleteAuthorization(@PathParam("id") Long id) {
 
         ResourceAuthorization existing = resourceAuthorizationService.findById(id);
@@ -635,6 +605,21 @@ public class SecuredEndpointResource {
         resourceAuthorizationService.delete(id);
 
         return Response.ok(Map.of("message", "Successfully deleted")).build();
+    }
+
+    public static class PageableSecuredEndpoints extends PageResource<EndpointMetadata> {
+
+        private List<EndpointMetadata> content;
+
+        @Override
+        public List<EndpointMetadata> getContent() {
+            return content;
+        }
+
+        @Override
+        public void setContent(List<EndpointMetadata> content) {
+            this.content = content;
+        }
     }
 }
 

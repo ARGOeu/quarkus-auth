@@ -1,29 +1,22 @@
 package org.grnet.endpoint.scanner.runtime.entities.mongo.codec;
 
-import com.mongodb.MongoClientSettings;
 import org.bson.BsonInt64;
 import org.bson.BsonReader;
+import org.bson.BsonType;
 import org.bson.BsonValue;
 import org.bson.BsonWriter;
-import org.bson.Document;
-import org.bson.codecs.Codec;
 import org.bson.codecs.CollectibleCodec;
 import org.bson.codecs.DecoderContext;
 import org.bson.codecs.EncoderContext;
 import org.grnet.endpoint.scanner.runtime.entities.EndpointResolver;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
-import java.util.Objects;
-import java.util.UUID;
 
 public class EndpointResolverCodec implements CollectibleCodec<EndpointResolver> {
 
-    private final Codec<Document> documentCodec;
-
     public EndpointResolverCodec() {
-        this.documentCodec = MongoClientSettings.getDefaultCodecRegistry().get(Document.class);
     }
 
     @Override
@@ -45,39 +38,57 @@ public class EndpointResolverCodec implements CollectibleCodec<EndpointResolver>
     }
 
     @Override
-    public EndpointResolver decode(BsonReader bsonReader, DecoderContext decoderContext) {
+    public EndpointResolver decode(BsonReader reader, DecoderContext decoderContext) {
 
-        var document = documentCodec.decode(bsonReader, decoderContext);
-        var endpointResolver = new EndpointResolver();
-        endpointResolver.setId(document.getLong("_id"));
-        endpointResolver.setSecuredEndpointId(document.getString("secured_endpoint_id"));
-        endpointResolver.setResource(document.getString("resource"));
-        var date = (Date) document.get("created_at");
-        LocalDateTime localDateTime;
-        if(Objects.isNull(date)){
-            localDateTime = null;
-        } else {
+        var entity = new EndpointResolver();
+        reader.readStartDocument();
 
-            localDateTime = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        while (reader.readBsonType() != BsonType.END_OF_DOCUMENT) {
+            String fieldName = reader.readName();
+
+            switch (fieldName) {
+                case "_id":
+                    entity.setId(reader.readInt64());
+                    break;
+                case "secured_endpoint_id":
+                    entity.setSecuredEndpointId(reader.readString());
+                    break;
+                case "resource":
+                    entity.setResource(reader.readString());
+                    break;
+                case "mapped_field":
+                    entity.setMappedField(reader.readString());
+                case "original_field":
+                    entity.setOriginalField(reader.readString());
+                    break;
+                case "created_at":
+                    long millis = reader.readDateTime();
+                    entity.setCreatedAt(LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(millis),
+                            ZoneId.systemDefault()
+                    ));
+                    break;
+                default:
+                    reader.skipValue();
+                    break;
+            }
         }
-        endpointResolver.setCreatedAt(localDateTime);
-        endpointResolver.setMappedField(document.getString("mapped_field"));
-        endpointResolver.setOriginalField(document.getString("original_field"));
 
-        return endpointResolver;
+        reader.readEndDocument();
+        return entity;
     }
 
     @Override
     public void encode(BsonWriter bsonWriter, EndpointResolver endpointResolver, EncoderContext encoderContext) {
 
-        var doc = new Document();
-        doc.put("_id", endpointResolver.getId());
-        doc.put("resource", endpointResolver.getResource());
-        doc.put("created_at", endpointResolver.getCreatedAt());
-        doc.put("secured_endpoint_id", endpointResolver.getSecuredEndpointId());
-        doc.put("mapped_field", endpointResolver.getMappedField());
-        doc.put("original_field", endpointResolver.getOriginalField());
-        documentCodec.encode(bsonWriter, doc, encoderContext);
+        bsonWriter.writeStartDocument();
+        bsonWriter.writeInt64("_id", endpointResolver.getId());
+        bsonWriter.writeString("resource", endpointResolver.getResource());
+        bsonWriter.writeString("secured_endpoint_id", endpointResolver.getSecuredEndpointId());
+        bsonWriter.writeString("mapped_field", endpointResolver.getMappedField());
+        bsonWriter.writeString("original_field", endpointResolver.getOriginalField());
+        bsonWriter.writeDateTime("created_at", endpointResolver.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+        bsonWriter.writeEndDocument();
     }
 
     @Override
@@ -86,6 +97,6 @@ public class EndpointResolverCodec implements CollectibleCodec<EndpointResolver>
     }
 
     private long generateNewId() {
-        return UUID.randomUUID().getMostSignificantBits();
+        return System.currentTimeMillis();
     }
 }

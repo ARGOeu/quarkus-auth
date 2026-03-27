@@ -6,14 +6,10 @@ import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.grnet.endpoint.scanner.runtime.RepositoryRegistrar;
-import org.grnet.endpoint.scanner.runtime.entities.Repository;
-import org.grnet.endpoint.scanner.runtime.entities.ResourceRepository;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-
-import static io.quarkus.arc.ComponentsProvider.LOG;
 
 
 @ApplicationScoped
@@ -57,7 +53,6 @@ public class RepositoryRegistry {
     public Object findEntity(String resource, Object id) {
 
         Object repo = getRepository(resource);
-
 
         try {
             Method method = repo.getClass().getMethod("findById", Object.class);

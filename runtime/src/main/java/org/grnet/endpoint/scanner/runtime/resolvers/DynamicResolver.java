@@ -1,14 +1,11 @@
 package org.grnet.endpoint.scanner.runtime.resolvers;
 
-//import io.quarkus.logging.Log;
-import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
 import org.grnet.endpoint.scanner.runtime.services.ResolverConfigService;
 
-import static io.quarkus.arc.ComponentsProvider.LOG;
 
 public class DynamicResolver implements TestGroupIdResolver {
 
@@ -23,7 +20,7 @@ public class DynamicResolver implements TestGroupIdResolver {
 
 
     @Override
-    public String resolve(String securedEndpointId,String resource, String pathId) {
+    public String resolve(String securedEndpointId, String resource, String pathId) {
 
         String rawId = uriInfo.getPathParameters().getFirst(pathId);
         if (rawId == null || rawId.isBlank()) {

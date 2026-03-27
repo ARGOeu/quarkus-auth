@@ -1,6 +1,5 @@
 package org.grnet.endpoint.scanner.runtime.endpoints;
 
-import com.mongodb.lang.NonNull;
 import jakarta.validation.constraints.NotEmpty;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -13,5 +12,5 @@ public class UpdateAuthorizationRequest {
             description = "The rule to be updated",
             example = ".*:tenants:{id}:topology:{topology-id}:.*")
     @NotEmpty(message = "rule may not be empty.")
-    public String rule; // new rule value
+    public String rule;
 }

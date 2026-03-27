@@ -1,8 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.entities;
 
 
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 public class EndpointResolver  {

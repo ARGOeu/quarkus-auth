@@ -17,7 +17,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
     AgroalDataSource dataSource;
 
     @Override
-    public List<ResourceAuthorization> findAllResourceAuthorization() {
+    public List<ResourceAuthorization> findAll() {
         String sql = "SELECT * FROM resource_authorization";
         List<ResourceAuthorization> users = new ArrayList<>();
 
@@ -148,15 +148,16 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
         }
     }
 
-    public void update(ResourceAuthorization re) {
+    @Override
+    public void update(Long id, String rule) {
         String sql = "UPDATE resource_authorization SET rule = ?, created_at = ? WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, re.getRule());
-            ps.setTimestamp(2, Timestamp.valueOf(re.getCreatedAt()));
+            ps.setString(1, rule);
+            ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.now()));
 
-            ps.setLong(3, re.getId());
+            ps.setLong(3, id);
 
             ps.executeUpdate();
 

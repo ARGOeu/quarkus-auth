@@ -1,29 +1,22 @@
 package org.grnet.endpoint.scanner.runtime.entities.mongo.codec;
 
-import com.mongodb.MongoClientSettings;
 import org.bson.BsonInt64;
 import org.bson.BsonReader;
+import org.bson.BsonType;
 import org.bson.BsonValue;
 import org.bson.BsonWriter;
-import org.bson.Document;
-import org.bson.codecs.Codec;
 import org.bson.codecs.CollectibleCodec;
 import org.bson.codecs.DecoderContext;
 import org.bson.codecs.EncoderContext;
 import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
-import java.util.Objects;
-import java.util.UUID;
 
 public class ResourceAuthorizationCodec implements CollectibleCodec<ResourceAuthorization> {
 
-    private final Codec<Document> documentCodec;
-
     public ResourceAuthorizationCodec() {
-        this.documentCodec = MongoClientSettings.getDefaultCodecRegistry().get(Document.class);
     }
 
     @Override
@@ -45,34 +38,49 @@ public class ResourceAuthorizationCodec implements CollectibleCodec<ResourceAuth
     }
 
     @Override
-    public ResourceAuthorization decode(BsonReader bsonReader, DecoderContext decoderContext) {
+    public ResourceAuthorization decode(BsonReader reader, DecoderContext decoderContext) {
+        var entity = new ResourceAuthorization();
+        reader.readStartDocument();
 
-        var document = documentCodec.decode(bsonReader, decoderContext);
-        var resourceAuthorization = new ResourceAuthorization();
-        resourceAuthorization.setId(document.getLong("_id"));
-        resourceAuthorization.setSecuredEndpointId(document.getString("secured_endpoint_id"));
-        resourceAuthorization.setRule(document.getString("rule"));
-        var date = (Date) document.get("created_at");
-        LocalDateTime localDateTime;
-        if(Objects.isNull(date)){
-            localDateTime = null;
-        } else {
+        while (reader.readBsonType() != BsonType.END_OF_DOCUMENT) {
+            String fieldName = reader.readName();
 
-            localDateTime = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+            switch (fieldName) {
+                case "_id":
+                    entity.setId(reader.readInt64());
+                    break;
+                case "secured_endpoint_id":
+                    entity.setSecuredEndpointId(reader.readString());
+                    break;
+                case "rule":
+                    entity.setRule(reader.readString());
+                    break;
+                case "created_at":
+                    long millis = reader.readDateTime();
+                    entity.setCreatedAt(LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(millis),
+                            ZoneId.systemDefault()
+                    ));
+                    break;
+                default:
+                    reader.skipValue();
+                    break;
+            }
         }
-        resourceAuthorization.setCreatedAt(localDateTime);
-        return resourceAuthorization;
+
+        reader.readEndDocument();
+        return entity;
     }
 
     @Override
     public void encode(BsonWriter bsonWriter, ResourceAuthorization resourceAuthorization, EncoderContext encoderContext) {
 
-        var doc = new Document();
-        doc.put("_id", resourceAuthorization.getId());
-        doc.put("rule", resourceAuthorization.getRule());
-        doc.put("created_at", resourceAuthorization.getCreatedAt());
-        doc.put("secured_endpoint_id", resourceAuthorization.getSecuredEndpointId());
-        documentCodec.encode(bsonWriter, doc, encoderContext);
+        bsonWriter.writeStartDocument();
+        bsonWriter.writeInt64("_id", resourceAuthorization.getId());
+        bsonWriter.writeString("rule", resourceAuthorization.getRule());
+        bsonWriter.writeString("secured_endpoint_id", resourceAuthorization.getSecuredEndpointId());
+        bsonWriter.writeDateTime("created_at", resourceAuthorization.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+        bsonWriter.writeEndDocument();
     }
 
     @Override
@@ -81,6 +89,6 @@ public class ResourceAuthorizationCodec implements CollectibleCodec<ResourceAuth
     }
 
     private long generateNewId() {
-        return UUID.randomUUID().getMostSignificantBits();
+        return System.currentTimeMillis();
     }
 }
