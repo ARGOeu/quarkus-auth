@@ -30,9 +30,6 @@ public class RepositoryRegistry {
                         Object repo = CDI.current()
                                 .select(clazz, Any.Literal.INSTANCE)
                                 .get();
-//                        Object repo = CDI.current()
-//                                .select(clazz)
-//                                .get();
 
                         Method method = clazz.getMethod("findById", Object.class);
 

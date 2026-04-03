@@ -304,12 +304,12 @@ public class SecuredEndpointResource {
                     type = SchemaType.OBJECT,
                     implementation = Object.class)))
     @GET
-    @Path("/{secured-endpoint-id}/resource-authorizations")
+    @Path("/{secured-endpoint-id}/rules")
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ResourceAuthorization> getResourceAuthorizationList(
             @PathParam("secured-endpoint-id") String id) {
-        return resourceAuthorizationService.findAllResourcesAuthorization();
+        return resourceAuthorizationService.findByEndpointSecuredEndpointId(id);
     }
 
     @Tag(name = "Secured Endpoints")
