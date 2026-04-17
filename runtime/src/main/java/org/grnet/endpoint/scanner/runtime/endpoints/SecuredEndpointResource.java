@@ -179,7 +179,7 @@ public class SecuredEndpointResource {
         }
 
 
-        return resourceAuthorizationService.findAllResourcesAuthorization();
+        return resourceAuthorizationService.findByEndpointSecuredEndpointId(id);
     }
 
 //    @Tag(name = "Secured Endpoints")
