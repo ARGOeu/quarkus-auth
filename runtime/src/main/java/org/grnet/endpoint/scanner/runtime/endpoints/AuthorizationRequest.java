@@ -9,7 +9,7 @@ import java.util.List;
 @Schema(description = "AuthorizationRequest represents a list of ResourceAuthorization objects of a secured endpoint to be created")
 public class AuthorizationRequest {
 
-    @NotEmpty(message = "rules list must not be empty")
+    //@NotEmpty(message = "rules list must not be empty")
     @Schema(
             type = SchemaType.ARRAY,
             implementation = List.class,

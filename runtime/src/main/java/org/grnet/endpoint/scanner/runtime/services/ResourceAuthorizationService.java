@@ -70,6 +70,7 @@ public class ResourceAuthorizationService {
     public List<ResourceAuthorization> findAllResourcesAuthorization() {
         return repository.findAll();
     }
+
     public void delete(Long id) {
         repository.delete(id);
     }
