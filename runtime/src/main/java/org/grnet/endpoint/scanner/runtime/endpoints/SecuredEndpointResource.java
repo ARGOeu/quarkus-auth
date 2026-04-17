@@ -179,7 +179,7 @@ public class SecuredEndpointResource {
         }
 
 
-        return resourceAuthorizationService.findAllResourcesAuthorization();
+        return resourceAuthorizationService.findByEndpointSecuredEndpointId(id);
     }
 
 //    @Tag(name = "Secured Endpoints")
@@ -332,7 +332,7 @@ public class SecuredEndpointResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public List<ResourceAuthorization> getResourceAuthorizationList(
             @PathParam("secured-endpoint-id") String id) {
-        return resourceAuthorizationService.findAllResourcesAuthorization();
+        return resourceAuthorizationService.findByEndpointSecuredEndpointId(id);
     }
 
     @Tag(name = "Secured Endpoints")
