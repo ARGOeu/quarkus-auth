@@ -13,12 +13,9 @@ import jakarta.ws.rs.core.UriInfo;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
-import org.grnet.endpoint.scanner.runtime.resolvers.TestGroupIdResolver;
-import org.grnet.endpoint.scanner.runtime.resolvers.TestResolver;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.jboss.logging.Logger;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -102,10 +99,10 @@ public class SecuredEndpointInterceptor {
         try {
             var resolvedRule = rule;
 
-            // 1️⃣ Resolve dynamic placeholders via resolvers
-            if (resolvedRule.contains("{")) {
-                resolvedRule = resolveRegex(securedEndpointId, method, resolvedRule);
-            }
+//            // 1️⃣ Resolve dynamic placeholders via resolvers
+//            if (resolvedRule.contains("{")) {
+//                resolvedRule = resolveRegex(securedEndpointId, method, resolvedRule);
+//            }
 
             // 2️⃣ Replace path parameters with actual values (escaped for regex)
                 for (Map.Entry<String, String> entry : pathParams.entrySet()) {
@@ -172,29 +169,29 @@ public class SecuredEndpointInterceptor {
         return path.replaceAll("//+", "/");
     }
 
-    private String resolveRegex(String securedEndpointId, Method method, String regex) {
-        var endpoint = method.getAnnotation(SecuredEndpoint.class);
-        var resolverDefs = endpoint.resolvers();
-
-        var resolvedRule = regex;
-        for (TestResolver resolverDef : resolverDefs) {
-            Class<? extends TestGroupIdResolver> resolverClass = resolverDef.idResolver();
-            String pathId = resolverDef.pathId();
-
-            TestGroupIdResolver resolver = resolverInstances.select(resolverClass).get();
-            List<EndpointMetadata> endpoints = endpointMetadataHolder.getData();
-            String resource = endpoints.stream()
-                    .filter(e -> e.getSecuredEndpointId().equals(securedEndpointId))
-                    .findFirst()
-                    .map(e -> resolveResourceFromPath(e.getPath(), pathId))
-                    .orElseThrow(() -> new IllegalStateException(
-                            "No endpoint metadata found for securedEndpointId " + securedEndpointId));
-
-            String resolvedValue = resolver.resolve(securedEndpointId, resource, pathId);
-            resolvedRule = resolvedRule.replace("{" + pathId + "}", resolvedValue);
-        }
-        return resolvedRule;
-    }
+//    private String resolveRegex(String securedEndpointId, Method method, String regex) {
+//        var endpoint = method.getAnnotation(SecuredEndpoint.class);
+//        var resolverDefs = endpoint.resolvers();
+//
+//        var resolvedRule = regex;
+//        for (TestResolver resolverDef : resolverDefs) {
+//            Class<? extends TestGroupIdResolver> resolverClass = resolverDef.idResolver();
+//            String pathId = resolverDef.pathId();
+//
+//            TestGroupIdResolver resolver = resolverInstances.select(resolverClass).get();
+//            List<EndpointMetadata> endpoints = endpointMetadataHolder.getData();
+//            String resource = endpoints.stream()
+//                    .filter(e -> e.getSecuredEndpointId().equals(securedEndpointId))
+//                    .findFirst()
+//                    .map(e -> resolveResourceFromPath(e.getPath(), pathId))
+//                    .orElseThrow(() -> new IllegalStateException(
+//                            "No endpoint metadata found for securedEndpointId " + securedEndpointId));
+//
+//            String resolvedValue = resolver.resolve(securedEndpointId, resource, pathId);
+//            resolvedRule = resolvedRule.replace("{" + pathId + "}", resolvedValue);
+//        }
+//        return resolvedRule;
+//    }
 
     private String resolveResourceFromPath(String fullPath, String pathId) {
         var segments = fullPath.split("/");
