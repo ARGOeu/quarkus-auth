@@ -13,6 +13,7 @@ import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.grnet.endpoint.scanner.runtime.ApiResource;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
@@ -129,6 +130,27 @@ class EndpointScannerProcessor {
             if (httpMethod == null) {
                 continue; // not a REST endpoint
             }
+
+//            var resourceValue = annotation.value("resource");
+//
+//            if (resourceValue != null) {
+//                var resourceClassName = resourceValue.asClass().name();
+//                var resourceClassInfo = index.getClassByName(resourceClassName);
+//
+//                var apiResourceInterface = DotName.createSimple(ApiResource.class.getName());
+//
+//                if (!resourceClassInfo.interfaceNames().contains(apiResourceInterface)) {
+//                    throw new IllegalStateException(
+//                            resourceClassName + " must implement ApiResource interface!"
+//                    );
+//                }
+//
+//                if (!resourceClassInfo.isEnum()) {
+//                    throw new IllegalStateException(
+//                            resourceClassInfo.simpleName() + " must be an enum!"
+//                    );
+//                }
+//            }
 
             // Read @Path from the method (e.g. "/items/{id}")
             String methodPath = "";
