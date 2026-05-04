@@ -10,6 +10,7 @@ import java.lang.annotation.Target;
 public @interface ParamRef {
 
     String param() default "";
+    ParamType type();
 
     Class<? extends ApiResource> referTo() default NoResource.class;
 }

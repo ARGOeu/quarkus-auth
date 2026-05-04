@@ -26,8 +26,7 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import org.grnet.endpoint.scanner.runtime.ApiResourceMetadata;
-import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
+import org.grnet.endpoint.scanner.runtime.*;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
 import java.util.List;
@@ -127,7 +126,7 @@ public class ApiResourceEndpoint {
                     implementation = Object.class)))
     @POST
     @Produces(MediaType.APPLICATION_JSON)
-    @SecuredEndpoint
+
     public Response assignRoleToUser(@Valid @NotNull(message = "The request body is empty.") AssignRoleRequest request) {
 
         var resources = resourceAuthorizationService.assignRoleToUser(request);
