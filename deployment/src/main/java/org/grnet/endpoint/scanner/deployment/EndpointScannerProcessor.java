@@ -41,6 +41,7 @@ import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementReposit
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.EndpointResolverJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.RoleEndpointJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.EndpointResolverMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Actor;
@@ -48,6 +49,7 @@ import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Acto
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Setting;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.PersistenceEntitlementMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.RoleEndpointMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
@@ -213,11 +215,11 @@ class EndpointScannerProcessor {
         endpoints
                 .stream()
                 .map(EndpointMetadata::getSecuredEndpointId)
-                .filter(hashed->hashed.equals(endpoint.getSecuredEndpointId()))
+                .filter(hashed -> hashed.equals(endpoint.getSecuredEndpointId()))
                 .findAny()
                 .ifPresent(val -> {
-            throw new IllegalArgumentException("Duplicate hashed secured endpoint id detected: " + val);
-        });
+                    throw new IllegalArgumentException("Duplicate hashed secured endpoint id detected: " + val);
+                });
 
         endpoints.add(endpoint);
     }
@@ -247,6 +249,8 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorization.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EndpointResolver.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.class.getName()));
+
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Entitlement.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ActorEntitlements.class.getName()));
@@ -295,7 +299,8 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
                 AdditionalBeanBuildItem.unremovableOf(GroupIdResolver.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class));
+                AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class),
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class));
     }
 
     @BuildStep
@@ -362,12 +367,15 @@ class EndpointScannerProcessor {
         Class<?> persistenceEntitlementImplementation;
         Class<?> entitlementProviderImplementation;
         Class<?> endpointResolverImplementation;
+        Class<?> roleEndpointImplementation;
+
 
         if (!jdbcDataSourceBuildItems.isEmpty()) {
             resourceAuthorizationImplementation = ResourceAuthorizationJdbcRepository.class;
             persistenceEntitlementImplementation = PersistenceEntitlementJDBCRepository.class;
             entitlementProviderImplementation = EntitlementProviderWithoutPersistence.class;
             endpointResolverImplementation = EndpointResolverJdbcRepository.class;
+            roleEndpointImplementation = RoleEndpointJdbcRepository.class;
 
         } else {
 
@@ -375,6 +383,8 @@ class EndpointScannerProcessor {
             persistenceEntitlementImplementation = PersistenceEntitlementMongoRepository.class;
             entitlementProviderImplementation = EntitlementProviderWithPersistence.class;
             endpointResolverImplementation = EndpointResolverMongoRepository.class;
+            roleEndpointImplementation = RoleEndpointMongoRepository.class;
+
         }
 
         return List.of(AdditionalBeanBuildItem
@@ -392,6 +402,10 @@ class EndpointScannerProcessor {
                 .build(), AdditionalBeanBuildItem
                 .builder()
                 .addBeanClass(entitlementProviderImplementation)
+                .setUnremovable()
+                .build(),AdditionalBeanBuildItem
+                .builder()
+                .addBeanClass(roleEndpointImplementation)
                 .setUnremovable()
                 .build()
         );
@@ -476,7 +490,7 @@ class EndpointScannerProcessor {
     private boolean isCdiBean(ClassInfo classInfo) {
 
         // CDI Scope annotations
-       var cdiScopes = List.of(
+        var cdiScopes = List.of(
                 DotName.createSimple("jakarta.enterprise.context.ApplicationScoped"),
                 DotName.createSimple("jakarta.enterprise.context.RequestScoped"),
                 DotName.createSimple("jakarta.enterprise.context.SessionScoped"),

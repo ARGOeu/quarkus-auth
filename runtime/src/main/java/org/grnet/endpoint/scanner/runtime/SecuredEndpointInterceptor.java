@@ -1,28 +1,36 @@
 package org.grnet.endpoint.scanner.runtime;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
-import jakarta.ws.rs.ForbiddenException;
-import jakarta.ws.rs.HttpMethod;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.UriInfo;
+import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
+import org.grnet.endpoint.scanner.runtime.entities.RoleEndpointRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.jboss.logging.Logger;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -30,54 +38,51 @@ import java.util.stream.Collectors;
 @SecuredEndpoint
 @Priority(10)
 public class SecuredEndpointInterceptor {
+    @Inject
+    ObjectMapper objectMapper;
 
     @Inject
     EntitlementProvider entitlementProvider;
     @Inject
-    UriInfo uriInfo;
-    @Inject
-    EndpointMetadataHolder endpointMetadataHolder;
-    @Inject
-    ResourceAuthorizationService resourceAuthorizationService;
-
-    @Inject
-    Instance<GroupIdResolver> resolverInstances;
+    RoleEndpointRepository roleEndpointRepository;
     @Inject
     SecuredEndpointConfig config;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
+    private static List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
+
 
     @AroundInvoke
     public Object checkAccess(InvocationContext context) throws Exception {
 
-        var entitlements = entitlementProvider.fetchEntitlements();
-
-        if (entitlementProvider.isSuperAdmin(config)) {
+       if (entitlementProvider.isSuperAdmin(config)) {
             return context.proceed();
         }
 
         var method = context.getMethod();
-        var httpMethod = getHttpMethod(method);
-        var fullPath = buildFullPath(context, method);
+        var secured = method.getAnnotation(SecuredEndpoint.class);
 
-        var securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
-
-        var authList = resourceAuthorizationService.findByEndpointSecuredEndpointId(securedEndpointId);
-        if (authList.isEmpty()) {
-            throw new ForbiddenException("You cannot access this resource!");
+        if (secured == null) {
+            throw new ForbiddenException("No security configuration found!");
         }
 
-        // Map of request path params
-        var pathParams = uriInfo.getPathParameters()
-                .entrySet()
-                .stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> e.getValue().get(0)
-                ));
+        var entitlements = extractEntitlements();
 
-        boolean hasAccess = authList.stream()
-                .anyMatch(ra -> matchesRule(entitlements, ra.getRule(), pathParams, securedEndpointId, method));
+        var securedEndpointId = generateSecuredEndpointId(
+                getHttpMethod(method),
+                buildFullPath(context, method)
+        );
+
+        ROLE_ENDPOINTS=roleEndpointRepository.list("secured_endpoint_id",securedEndpointId);
+
+        RequestParams params = read(context, method);
+
+        boolean hasAccess = checkEntitlement(
+                entitlements,
+                securedEndpointId,
+                secured,
+                params
+        );
 
         if (!hasAccess) {
             throw new ForbiddenException("You cannot access this resource!");
@@ -86,7 +91,175 @@ public class SecuredEndpointInterceptor {
         return context.proceed();
     }
 
-    // ---------------- Helpers ----------------
+    private List<String> extractEntitlements() {
+        return entitlementProvider.fetchEntitlements().stream()
+                .map(e -> {
+                    String raw = e.getRaw();
+                    String prefix = "status-pages:";
+                    int idx = raw.indexOf(prefix);
+
+                    String value = (idx != -1)
+                            ? raw.substring(idx + prefix.length())
+                            : raw;
+
+                    return value.replaceAll(":role=[^:]+", "");
+                })
+                .toList();
+    }
+
+    private boolean checkEntitlement(
+            List<String> entitlements,
+            String securedEndpointId,
+            SecuredEndpoint secured,
+            RequestParams params
+    ) {
+
+        List<String> acceptedAccess = extractAcceptedAccess(secured, params);
+
+        return ROLE_ENDPOINTS.stream()
+                .anyMatch(entry -> {
+
+                    return acceptedAccess.stream()
+                            .anyMatch(access ->
+                                    entitlements.contains(entry.getRoleName() + ":" + access)
+                            );
+                });
+    }
+
+    private List<String> extractAcceptedAccess(
+            SecuredEndpoint secured,
+            RequestParams params
+    ) {
+
+        Map<ParamType, Map<String, Object>> sources = Map.of(
+                ParamType.PATH, params.path,
+                ParamType.BODY, extractBody(params.body),
+                ParamType.QUERY, params.query,
+                ParamType.HEADER, params.header
+        );
+
+        Map<ParamType, Map<String, ParamRef>> refMaps =
+                Arrays.stream(secured.params())
+                        .collect(Collectors.groupingBy(
+                                ParamRef::type,
+                                Collectors.toMap(ParamRef::param, Function.identity())
+                        ));
+
+        List<String> acceptedAccess = new ArrayList<>();
+
+        for (var type : sources.keySet()) {
+            processParams(
+                    sources.get(type),
+                    refMaps.getOrDefault(type, Map.of()),
+                    acceptedAccess
+            );
+        }
+
+        return acceptedAccess;
+    }
+    private void processParams(
+            Map<String, Object> values,
+            Map<String, ParamRef> refMap,
+            List<String> acceptedAccess
+    ) {
+
+        for (var entry : values.entrySet()) {
+
+            ParamRef ref = refMap.get(entry.getKey());
+            if (ref == null) continue;
+
+            Class<? extends ApiResource> resource = ref.referTo();
+
+            if (!resource.isEnum()) {
+                throw new IllegalStateException(resource + " is not an enum");
+            }
+
+            Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) resource;
+
+            String resourceType = enumClass.getEnumConstants()[0].name();
+            String resourceValue = entry.getValue() + "-" + resourceType;
+
+            acceptedAccess.add(resourceValue);
+        }
+    }
+
+        public class RequestParams {
+
+        public final Map<String, Object> path = new HashMap<>();
+        public final Map<String, Object> query = new HashMap<>();
+        public final Map<String, Object> header = new HashMap<>();
+        public final List<Object> body = new ArrayList<>();
+
+    }
+    private Map<String, Object> extractBody(Object body) {
+
+        if (body == null) {
+            return Map.of();
+        }
+
+        // ✔ Case 1: already a Map
+        if (body instanceof Map<?, ?> map) {
+            return (Map<String, Object>) map;
+        }
+
+        // ✔ Case 2: Collection (List, etc)
+        if (body instanceof Iterable<?> iterable) {
+
+            Map<String, Object> result = new HashMap<>();
+
+            for (Object item : iterable) {
+                Map<String, Object> extracted =
+                        objectMapper.convertValue(item, new TypeReference<Map<String, Object>>() {});
+                result.putAll(extracted); // 🔥 flatten
+            }
+
+            return result;
+        }
+
+        // ✔ Case 3: normal object
+        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {});
+    }
+    private boolean isSimpleType(Class<?> clazz) {
+        return clazz.isPrimitive()
+                || clazz == String.class
+                || Number.class.isAssignableFrom(clazz)
+                || clazz == Boolean.class
+                || clazz == Character.class;
+    }
+    public RequestParams read(InvocationContext context, Method method) {
+
+        RequestParams result = new RequestParams();
+
+        Parameter[] params = method.getParameters();
+        Object[] values = context.getParameters();
+
+        for (int i = 0; i < params.length; i++) {
+
+            Parameter p = params[i];
+            Object value = values[i];
+
+            if (p.isAnnotationPresent(PathParam.class)) {
+                result.path.put(p.getAnnotation(PathParam.class).value(), value);
+                continue;
+            }
+
+            if (p.isAnnotationPresent(QueryParam.class)) {
+                result.query.put(p.getAnnotation(QueryParam.class).value(), value);
+                continue;
+            }
+
+            if (p.isAnnotationPresent(HeaderParam.class)) {
+                result.header.put(p.getAnnotation(HeaderParam.class).value(), value);
+                continue;
+            }
+
+            // BODY fallback
+            result.body.add(value);
+        }
+
+        return result;
+    }
+    // version to support rules ---------------- Helpers ----------------
 
     private boolean matchesRule(List<Entitlement> entitlements,
                                 String rule,
@@ -102,12 +275,12 @@ public class SecuredEndpointInterceptor {
 //            }
 
             // 2️⃣ Replace path parameters with actual values (escaped for regex)
-                for (Map.Entry<String, String> entry : pathParams.entrySet()) {
-                    resolvedRule = resolvedRule.replace(
-                            "{" + entry.getKey() + "}",
-                            escapeRegexChars(entry.getValue())
-                    );
-                }
+            for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+                resolvedRule = resolvedRule.replace(
+                        "{" + entry.getKey() + "}",
+                        escapeRegexChars(entry.getValue())
+                );
+            }
 
             // 3️⃣ If no regex wildcards, escape rule for literal match
 //            if (!resolvedRule.contains(".*") && !resolvedRule.contains("^") && !resolvedRule.contains("$")) {
@@ -120,7 +293,7 @@ public class SecuredEndpointInterceptor {
             return entitlements.stream()
                     .anyMatch(e ->
 
-                    pattern.matcher(e.getRaw()).find());
+                            pattern.matcher(e.getRaw()).find());
 
 
         } catch (Exception ex) {
@@ -128,10 +301,12 @@ public class SecuredEndpointInterceptor {
             return false;
         }
     }
+
     private String escapeRegexChars(String value) {
         // Escape only regex meta characters: . \ + * ? [ ^ ] $ ( ) { } = ! < > | : -
         return value.replaceAll("([\\\\.+*?\\[\\]^$(){}=!<>|:-])", "\\\\$1");
     }
+
     private String generateSecuredEndpointId(String httpMethod, String fullPath) {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
@@ -204,4 +379,22 @@ public class SecuredEndpointInterceptor {
     private String capitalize(String s) {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
+
+    private String readBody(ContainerRequestContext context) {
+        try (InputStream is = context.getEntityStream()) {
+            String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+
+            // reset stream so JAX-RS can still use it
+            context.setEntityStream(
+                    new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
+            );
+
+            return body;
+
+        } catch (IOException e) {
+            throw new RuntimeException("Cannot read request body", e);
+        }
+    }
+
+
 }

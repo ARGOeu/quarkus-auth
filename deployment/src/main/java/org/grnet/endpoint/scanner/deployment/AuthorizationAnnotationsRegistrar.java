@@ -9,11 +9,18 @@ import java.util.Set;
 public class AuthorizationAnnotationsRegistrar implements InterceptorBindingRegistrar {
 
     static final List<InterceptorBinding> SECURITY_BINDINGS = List.of(
-            InterceptorBinding.of(SecuredEndpoint.class, Set.of())
+            InterceptorBinding.of(SecuredEndpoint.class, Set.of("params"))
     );
 
     @Override
     public List<InterceptorBinding> getAdditionalBindings() {
         return SECURITY_BINDINGS;
     }
+//static final List<InterceptorBinding> SECURITY_BINDINGS =
+//        List.of(InterceptorBinding.of(SecuredEndpoint.class));
+//
+//    @Override
+//    public List<InterceptorBinding> getAdditionalBindings() {
+//        return SECURITY_BINDINGS;
+//    }
 }
