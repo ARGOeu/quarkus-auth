@@ -1,8 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.entitlements;
 
 import io.quarkus.oidc.TokenIntrospection;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointConfig;
 
 import java.util.Collections;

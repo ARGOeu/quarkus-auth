@@ -11,12 +11,16 @@ import io.quarkus.runtime.RuntimeValue;
 import io.quarkus.runtime.annotations.Recorder;
 import io.smallrye.config.SmallRyeConfig;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsTokenProvider;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
 import org.grnet.endpoint.scanner.runtime.entitlements.PersistenceEntitlementService;
 import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
+import org.grnet.endpoint.scanner.runtime.services.Utility;
 import org.jboss.logging.Logger;
 
 import java.util.Collection;
@@ -58,7 +62,7 @@ public class EndpointRecorder {
     }
 
     public void initSchema() {
-      var schemaInitializer = Arc.container().select(SchemaInitializer.class);
+        var schemaInitializer = Arc.container().select(SchemaInitializer.class);
 
         if (schemaInitializer.getHandle().getBean().isActive()) {
 
@@ -80,7 +84,7 @@ public class EndpointRecorder {
         return new RuntimeValue<>(data);
     }
 
-    public RuntimeValue<List<ResourceRepositoryMetadata>> storeResourceRepositoryMetadata(List<ResourceRepositoryMetadata> data) {
+    public RuntimeValue<List<ApiResourceMetadata>> storeApiResources(List<ApiResourceMetadata> data) {
         return new RuntimeValue<>(data);
     }
 
@@ -91,9 +95,9 @@ public class EndpointRecorder {
         };
     }
 
-    public BeanContainerListener configureResourceRepositoryBeanContainer(RuntimeValue<List<ResourceRepositoryMetadata>> metadata) {
+    public BeanContainerListener configureApiResourceBeanContainer(RuntimeValue<List<ApiResourceMetadata>> metadata) {
         return beanContainer -> {
-            var bean = beanContainer.beanInstance(ResourceRepositoryMetadataHolder.class);
+            var bean = beanContainer.beanInstance(ApiResourceHolder.class);
             bean.setData(metadata.getValue());
         };
     }
@@ -119,5 +123,51 @@ public class EndpointRecorder {
 
             return new OIDCEntitlementService(a, config);
         };
+    }
+
+    public Function<SyntheticCreationalContext<Utility>, Utility> createUtilityService() {
+        return context -> {
+            // ServiceA is index 0, ServiceB is index 1
+            var a = context.getInjectedReference(TokenIntrospection.class);
+
+            var config = ConfigProvider.getConfig()
+                    .unwrap(SmallRyeConfig.class)
+                    .getConfigMapping(SecuredEndpointConfig.class);
+
+            return new Utility(a, config);
+        };
+    }
+
+    public RuntimeValue<AuthGroupManagement> createAuthGroupManagement(RuntimeValue<BearerTokenRequestFilter> filter) {
+
+        var config = ConfigProvider.getConfig();
+
+        var url = config.getValue(
+                "api.auth.entitlements.keycloak-group-management-client-url", String.class);
+
+        var parentGroup = config.getValue(
+                "api.auth.entitlements.parent-group", String.class);
+
+        return new RuntimeValue<>(new AuthGroupManagement(url, filter.getValue(), parentGroup));
+    }
+
+    public RuntimeValue<KeycloakClientCredentialsTokenProvider> createAuthTokenClient() {
+
+
+        var config = ConfigProvider.getConfig();
+
+        var url = config.getValue(
+                "api.auth.entitlements.keycloak-group-management-client-url", String.class);
+        var clientId = config.getValue(
+                "api.auth.entitlements.keycloak-group-management-client-id", String.class);
+        var clientSecret = config.getValue(
+                "api.auth.entitlements.keycloak-group-management-client-secret", String.class);
+
+        return new RuntimeValue<>(new KeycloakClientCredentialsTokenProvider(url, clientId, clientSecret));
+    }
+
+    public RuntimeValue<BearerTokenRequestFilter> createBearerTokenRequestFilter(RuntimeValue<KeycloakClientCredentialsTokenProvider> tokenProvider) {
+
+        return new RuntimeValue<>(new BearerTokenRequestFilter(tokenProvider.getValue()));
     }
 }
