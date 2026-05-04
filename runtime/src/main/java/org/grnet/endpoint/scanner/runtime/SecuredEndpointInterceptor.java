@@ -45,9 +45,6 @@ public class SecuredEndpointInterceptor {
     @Inject
     SecuredEndpointConfig config;
 
-    @Inject
-    ResourceRepositoryMetadataHolder resourceRepositoryMetadataHolder;
-
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
 
     @AroundInvoke

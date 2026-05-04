@@ -14,13 +14,29 @@ import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.ApiResource;
+import org.grnet.endpoint.scanner.runtime.ApiResourceHolder;
+import org.grnet.endpoint.scanner.runtime.ApiResourceMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
-import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadata;
-import org.grnet.endpoint.scanner.runtime.ResourceRepositoryMetadataHolder;
+import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsTokenProvider;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakGroupManagementClient;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakTokenClient;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUserResponse;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.UserGroupInfoDto;
+import org.grnet.endpoint.scanner.runtime.endpoints.ApiResourceEndpoint;
+import org.grnet.endpoint.scanner.runtime.endpoints.AssignRoleRequest;
+import org.grnet.endpoint.scanner.runtime.endpoints.CreateRoleRequest;
+import org.grnet.endpoint.scanner.runtime.endpoints.InformativeResponse;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageLink;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
+import org.grnet.endpoint.scanner.runtime.endpoints.RoleEndpoint;
+import org.grnet.endpoint.scanner.runtime.endpoints.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.endpoints.UserEndpoint;
+import org.grnet.endpoint.scanner.runtime.endpoints.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.EndpointResolverJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
@@ -48,15 +64,16 @@ import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.OidcEntitlemen
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.PersistenceEntitlement;
 
 import org.grnet.endpoint.scanner.runtime.entities.*;
-import org.grnet.endpoint.scanner.runtime.resolvers.DynamicResolver;
+import org.grnet.endpoint.scanner.runtime.process.AfterProcessing;
+import org.grnet.endpoint.scanner.runtime.process.BeforeProcessing;
+import org.grnet.endpoint.scanner.runtime.process.Event;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
-import org.grnet.endpoint.scanner.runtime.resolvers.RepositoryRegistry;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
-import org.grnet.endpoint.scanner.runtime.services.ResolverConfigService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
+import org.grnet.endpoint.scanner.runtime.services.Utility;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.ClassInfo;
@@ -71,11 +88,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 
@@ -131,26 +148,6 @@ class EndpointScannerProcessor {
                 continue; // not a REST endpoint
             }
 
-//            var resourceValue = annotation.value("resource");
-//
-//            if (resourceValue != null) {
-//                var resourceClassName = resourceValue.asClass().name();
-//                var resourceClassInfo = index.getClassByName(resourceClassName);
-//
-//                var apiResourceInterface = DotName.createSimple(ApiResource.class.getName());
-//
-//                if (!resourceClassInfo.interfaceNames().contains(apiResourceInterface)) {
-//                    throw new IllegalStateException(
-//                            resourceClassName + " must implement ApiResource interface!"
-//                    );
-//                }
-//
-//                if (!resourceClassInfo.isEnum()) {
-//                    throw new IllegalStateException(
-//                            resourceClassInfo.simpleName() + " must be an enum!"
-//                    );
-//                }
-//            }
 
             // Read @Path from the method (e.g. "/items/{id}")
             String methodPath = "";
@@ -242,6 +239,12 @@ class EndpointScannerProcessor {
 
         additionalBeans.produce(new AdditionalBeanBuildItem(SecuredEndpointResource.class));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(ApiResourceEndpoint.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ApiResourceEndpoint.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(RoleEndpoint.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(UserEndpoint.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(UserEndpoint.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ResourceAuthorization.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EndpointResolver.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Actor.class.getName()));
@@ -250,10 +253,26 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Setting.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageLink.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageResource.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(GroupUserResponse.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PartialGroup.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(UserGroupInfoDto.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Page.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(PageQuery.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(SecuredEndpointResource.PageableSecuredEndpoints.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ApiResourceEndpoint.PageableApiResources.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(EndpointMetadata.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(ApiResourceMetadata.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(KeycloakGroupManagementClient.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(KeycloakGroupManagementClient.class.getName()));
+        additionalBeans.produce(new AdditionalBeanBuildItem(KeycloakTokenClient.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(KeycloakTokenClient.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Event.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(InformativeResponse.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(AssignRoleRequest.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(CreateRoleRequest.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(UserProfileDto.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleResponse.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.PageableRoleResponse.class.getName()));
     }
 
     @BuildStep
@@ -270,13 +289,10 @@ class EndpointScannerProcessor {
 
         return List.of(
                 AdditionalBeanBuildItem.unremovableOf(EndpointMetadataHolder.class),
-                AdditionalBeanBuildItem.unremovableOf(ResourceRepositoryMetadataHolder.class),
+                AdditionalBeanBuildItem.unremovableOf(ApiResourceHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(PersistenceEntitlementRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationService.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverService.class),
-                AdditionalBeanBuildItem.unremovableOf(RepositoryRegistry.class),
-                AdditionalBeanBuildItem.unremovableOf(DynamicResolver.class),
-                AdditionalBeanBuildItem.unremovableOf(ResolverConfigService.class),
                 AdditionalBeanBuildItem.unremovableOf(GroupIdResolver.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class));
@@ -309,6 +325,14 @@ class EndpointScannerProcessor {
                 .addInjectionPoint(ClassType.create(DotName.createSimple(TokenIntrospection.class.getName())))
                 .createWith(recorder.createOidcEntitlementService());
 
+        var utilityService = SyntheticBeanBuildItem
+                .configure(Utility.class)
+                .scope(ApplicationScoped.class)
+                .setRuntimeInit()
+                .unremovable()
+                .addInjectionPoint(ClassType.create(DotName.createSimple(TokenIntrospection.class.getName())))
+                .createWith(recorder.createUtilityService());
+
         if (jdbcDataSourceBuildItems.isEmpty()) {
 
             var persistenceEntitlementService = SyntheticBeanBuildItem
@@ -328,6 +352,7 @@ class EndpointScannerProcessor {
 
         syntheticBeanBuildItemBuildProducer.produce(initializer.done());
         syntheticBeanBuildItemBuildProducer.produce(oidcEntitlementService.done());
+        syntheticBeanBuildItemBuildProducer.produce(utilityService.done());
     }
 
     @BuildStep
@@ -420,71 +445,32 @@ class EndpointScannerProcessor {
 
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
-    ResourceRepositoryMetadataBuildItem processRepositories(EndpointRecorder recorder, CombinedIndexBuildItem indexBuildItem) {
+    ApiResourcesBuildItem collectApiResources(EndpointRecorder recorder, CombinedIndexBuildItem combinedIndex) {
 
-        LOG.info("Process resource repositories...");
+        var validResources = new ArrayList<ApiResourceMetadata>();
 
-        var index = indexBuildItem.getIndex();
+        combinedIndex.getIndex().getAllKnownImplementations(DotName.createSimple(ApiResource.class.getName()))
+                .forEach(classInfo -> {
+                    if (!classInfo.isEnum()) {
 
-        var resourceRepository = DotName.createSimple(
-                "org.grnet.endpoint.scanner.runtime.entities.ResourceRepository"
-        );
+                        throw new IllegalStateException("Class [" + classInfo.name() + "] implements ApiResource but is not an enum! Class ["+ classInfo.name() +"] must be an enum!");
+                    } else {
+                        validResources.add(new ApiResourceMetadata(classInfo.simpleName()));
+                    }
+                });
 
-        var list = new ArrayList<ResourceRepositoryMetadata>();
+        // Pass build-time data to the recorder → produces a RuntimeValue
+        var metadata = recorder.storeApiResources(validResources);
 
-        var usedClassNames = new HashSet<>();
-        var usedValues = new HashSet<>();
+        return new ApiResourcesBuildItem(metadata);
+    }
 
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, ApiResourcesBuildItem resources, BuildProducer<BeanContainerListenerBuildItem> listeners) {
 
-        for (AnnotationInstance annotation : index.getAnnotations(resourceRepository)) {
-
-            if (annotation.target().kind() != AnnotationTarget.Kind.CLASS) {
-                LOG.warn("@ResourceRepository must be on a class, found on: " + annotation.target().kind());
-                continue;
-            }
-
-            // Get the target of the annotation (the class it's applied to)
-            var classInfo = annotation.target().asClass();
-
-            if (!isCdiBean(classInfo)) {
-                throw new IllegalStateException(
-                        "Class " + classInfo.name() + " annotated with @ResourceRepository " +
-                                "must be a CDI bean. Please annotate it with a scope " +
-                                "e.g. @ApplicationScoped, @RequestScoped, @Dependent etc."
-                );
-            }
-
-            var findByIdMethod = Optional.ofNullable(
-                            findMethodInHierarchy(index, classInfo, "findById"))
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Class " + classInfo.name() + " annotated with @ResourceRepository " +
-                                    "must declare a 'findById' method."
-                    ));
-
-            LOG.info("Found method: " + findByIdMethod.name() + " in " + classInfo.name());
-
-            // Get the fully qualified class name
-            var className = classInfo.name();
-            LOG.info("Annotation found on class: " + className.toString());
-
-            // You can also get the annotation value
-            var value = annotation.value().asString();
-            LOG.info("Annotation value: " + value);
-
-            if (usedClassNames.contains(className.toString()) || usedValues.contains(value)) {
-                throw new IllegalArgumentException("Duplicate resource repository detected: value=%s".formatted(value));
-            }
-
-            var metadata = new ResourceRepositoryMetadata(className.toString(), value);
-
-            usedClassNames.add(className.toString());
-            usedValues.add(value);
-            list.add(metadata);
-        }
-
-        var metadata = recorder.storeResourceRepositoryMetadata(list);
-
-        return new ResourceRepositoryMetadataBuildItem(metadata);
+        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
+        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureApiResourceBeanContainer(resources.getApiResources())));
     }
 
     private boolean isCdiBean(ClassInfo classInfo) {
@@ -559,24 +545,48 @@ class EndpointScannerProcessor {
     }
 
     @BuildStep
-    @Record(ExecutionTime.STATIC_INIT)
-    void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, ResourceRepositoryMetadataBuildItem repos, BuildProducer<BeanContainerListenerBuildItem> listeners) {
+    @Record(ExecutionTime.RUNTIME_INIT)
+    public void createGroupManagementServices(EndpointRecorder recorder, BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer) {
 
-        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
-        listeners.produce(new BeanContainerListenerBuildItem(recorder.configureResourceRepositoryBeanContainer(repos.getRepositories())));
+        var tokenProvider = recorder.createAuthTokenClient();
+
+        var filter = recorder.createBearerTokenRequestFilter(tokenProvider);
+
+        syntheticBeanBuildItemBuildProducer.produce(SyntheticBeanBuildItem.configure(KeycloakClientCredentialsTokenProvider.class)
+                .unremovable()
+                .setRuntimeInit()
+                .runtimeValue(tokenProvider)
+                .done());
+
+        syntheticBeanBuildItemBuildProducer.produce(
+                SyntheticBeanBuildItem.configure(BearerTokenRequestFilter.class)
+                        .unremovable()
+                        .setRuntimeInit()
+                        .runtimeValue(filter)
+                        .done());
+
+        syntheticBeanBuildItemBuildProducer.produce(
+                SyntheticBeanBuildItem.configure(AuthGroupManagement.class)
+                .scope(ApplicationScoped.class)
+                .unremovable()
+                .setRuntimeInit()
+                .runtimeValue(recorder.createAuthGroupManagement(filter))
+                .done());
     }
 
     @BuildStep
-    void markResourceRepositoriesUnremovable(CombinedIndexBuildItem index, BuildProducer<UnremovableBeanBuildItem> unremovableBeans) {
-
-        var annotation = DotName.createSimple(ResourceRepository.class.getName());
-
-        index.getIndex().getAnnotations(annotation).forEach(a -> {
-            var target = a.target();
-            if (target.kind() == AnnotationTarget.Kind.CLASS) {
-                String className = target.asClass().name().toString();
-                unremovableBeans.produce(UnremovableBeanBuildItem.beanClassNames(className));
-            }
+    QualifierRegistrarBuildItem registerQualifiers() {
+        return new QualifierRegistrarBuildItem(() -> {
+            Map<DotName, Set<String>> qualifiers = new HashMap<>();
+            qualifiers.put(
+                    DotName.createSimple(BeforeProcessing.class.getName()),
+                    Set.of("endpoint")
+            );
+            qualifiers.put(
+                    DotName.createSimple(AfterProcessing.class.getName()),
+                    Set.of("endpoint")
+            );
+            return qualifiers;
         });
     }
 
