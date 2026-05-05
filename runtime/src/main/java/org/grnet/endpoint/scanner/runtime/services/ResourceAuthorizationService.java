@@ -92,7 +92,13 @@ public class ResourceAuthorizationService {
         return new PageResource<>(result, result.list, uriInfo);
     }
 
-    public PageResource<RoleResponse> getAllRoles(int page, int size, UriInfo uriInfo) {
+    public List<RoleResponse> getAllRoles() {
+
+        return authGroupManagement.getAllRoles();
+
+     }
+
+    public PageResource<RoleResponse> getAllRolesByPageAndSize(int page, int size, UriInfo uriInfo) {
 
         var all = authGroupManagement.getAllRoles();
 

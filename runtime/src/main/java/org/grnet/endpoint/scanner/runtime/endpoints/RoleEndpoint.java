@@ -133,7 +133,7 @@ public class RoleEndpoint {
             @QueryParam("size")
             int size, @Context UriInfo uriInfo) {
 
-        var resources = resourceAuthorizationService.getAllRoles(page - 1, size, uriInfo);
+        var resources = resourceAuthorizationService.getAllRolesByPageAndSize(page - 1, size, uriInfo);
 
         return Response.ok().entity(resources).build();
     }

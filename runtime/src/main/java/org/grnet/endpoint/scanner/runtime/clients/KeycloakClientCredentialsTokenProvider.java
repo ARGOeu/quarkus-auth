@@ -24,6 +24,7 @@ public class KeycloakClientCredentialsTokenProvider{
     }
 
     public String getAccessToken() {
+
         return tokenClient
                 .getToken("client_credentials", clientId, clientSecret)
                 .access_token;
