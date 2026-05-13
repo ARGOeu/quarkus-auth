@@ -23,7 +23,6 @@ pipeline {
                 cd ${WORKSPACE}/${PROJECT_DIR}
                 mvn -B clean verify
                 """
-                junit '**/target/surefire-reports/*.xml, **/target/failsafe-reports/*.xml'
                 archiveArtifacts artifacts: '**/runtime/target/*.jar, **/deployment/target/*.jar', allowEmptyArchive: true
                 step([ $class: 'JacocoPublisher' ])
             }
