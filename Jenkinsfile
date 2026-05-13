@@ -33,12 +33,12 @@ pipeline {
             }
         }
         stage('Publish to GitHub Packages') {
-            // when {
-            //     anyOf {
-            //         branch 'main'
-            //         branch 'devel'
-            //     }
-            // }
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'devel'
+                }
+            }
             agent {
                 docker {
                     image 'argo.registry:5000/rocky9-java17-mvn3.9.9:latest'
