@@ -33,12 +33,21 @@ pipeline {
             }
         }
         stage('Publish to GitHub Packages') {
+<<<<<<< jenkins-file
             when {
                 anyOf {
                     branch 'main'
                     branch 'devel'
                 }
             }
+=======
+            // when {
+            //     anyOf {
+            //         branch 'main'
+            //         branch 'devel'
+            //     }
+            // }
+>>>>>>> devel
             agent {
                 docker {
                     image 'argo.registry:5000/rocky9-java17-mvn3.9.9:latest'
@@ -96,4 +105,8 @@ EOF
             }
         }
     }
+<<<<<<< jenkins-file
 }
+=======
+}
+>>>>>>> devel
