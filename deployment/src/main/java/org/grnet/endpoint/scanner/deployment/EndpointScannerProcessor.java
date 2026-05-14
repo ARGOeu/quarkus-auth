@@ -456,24 +456,58 @@ class EndpointScannerProcessor {
         // Wire it into the CDI bean
         return new SecuredEndpointMetadataBuildItem(metadata);
     }
-
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
-    ApiResourcesBuildItem collectApiResources(EndpointRecorder recorder, CombinedIndexBuildItem combinedIndex) {
+    ApiResourcesBuildItem collectApiResources(
+            EndpointRecorder recorder,
+            CombinedIndexBuildItem combinedIndex
+    ) {
 
         var validResources = new ArrayList<ApiResourceMetadata>();
 
-        combinedIndex.getIndex().getAllKnownImplementations(DotName.createSimple(ApiResource.class.getName()))
-                .forEach(classInfo -> {
-                    if (!classInfo.isEnum()) {
+        var apiResourceDotName =
+                DotName.createSimple(ApiResource.class.getName());
 
-                        throw new IllegalStateException("Class [" + classInfo.name() + "] implements ApiResource but is not an enum! Class ["+ classInfo.name() +"] must be an enum!");
-                    } else {
-                        validResources.add(new ApiResourceMetadata(classInfo.simpleName()));
+        combinedIndex.getIndex()
+                .getAllKnownImplementations(apiResourceDotName)
+                .forEach(classInfo -> {
+
+                    if (!classInfo.isEnum()) {
+                        throw new IllegalStateException(
+                                "Class [" + classInfo.name()
+                                        + "] implements ApiResource but is not an enum!"
+                        );
+                    }
+
+                    try {
+
+                        String fqcn = classInfo.name().toString();
+
+                        Class<?> clazz = Thread.currentThread()
+                                .getContextClassLoader()
+                                .loadClass(fqcn);
+
+                        ApiResource apiResource =
+                                (ApiResource) clazz.getEnumConstants()[0];
+
+                        validResources.add(
+                                new ApiResourceMetadata(
+                                        apiResource.resourceName(),
+                                        fqcn
+                                )
+                        );
+
+
+                    } catch (Exception e) {
+
+                        throw new RuntimeException(
+                                "Failed to load ApiResource: "
+                                        + classInfo.name(),
+                                e
+                        );
                     }
                 });
 
-        // Pass build-time data to the recorder → produces a RuntimeValue
         var metadata = recorder.storeApiResources(validResources);
 
         return new ApiResourcesBuildItem(metadata);
@@ -484,6 +518,7 @@ class EndpointScannerProcessor {
     void configureBeans(EndpointRecorder recorder, SecuredEndpointMetadataBuildItem configItem, ApiResourcesBuildItem resources, BuildProducer<BeanContainerListenerBuildItem> listeners) {
 
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureBeanContainer(configItem.getEndpoints())));
+
         listeners.produce(new BeanContainerListenerBuildItem(recorder.configureApiResourceBeanContainer(resources.getApiResources())));
     }
 

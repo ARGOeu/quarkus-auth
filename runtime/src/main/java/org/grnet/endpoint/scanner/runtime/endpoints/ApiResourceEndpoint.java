@@ -126,7 +126,15 @@ public class ApiResourceEndpoint {
                     implementation = Object.class)))
     @POST
     @Produces(MediaType.APPLICATION_JSON)
-
+    @SecuredEndpoint(
+            params = {
+                    @ParamRef(
+                            param = "resource_id",
+                            type = ParamType.BODY,
+                            referToField = "api_resource"
+                    )
+            }
+    )
     public Response assignRoleToUser(@Valid @NotNull(message = "The request body is empty.") AssignRoleRequest request) {
 
         var resources = resourceAuthorizationService.assignRoleToUser(request);
