@@ -1,5 +1,6 @@
 package org.grnet.endpoint.scanner.runtime;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Priority;
@@ -47,6 +48,8 @@ public class SecuredEndpointInterceptor {
     RoleEndpointRepository roleEndpointRepository;
     @Inject
     SecuredEndpointConfig config;
+    @Inject
+    ApiResourceHolder apiResourceHolder;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
     private static List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
@@ -55,7 +58,7 @@ public class SecuredEndpointInterceptor {
     @AroundInvoke
     public Object checkAccess(InvocationContext context) throws Exception {
 
-       if (entitlementProvider.isSuperAdmin(config)) {
+        if (entitlementProvider.isSuperAdmin(config)) {
             return context.proceed();
         }
 
@@ -73,7 +76,7 @@ public class SecuredEndpointInterceptor {
                 buildFullPath(context, method)
         );
 
-        ROLE_ENDPOINTS=roleEndpointRepository.list("secured_endpoint_id",securedEndpointId);
+        ROLE_ENDPOINTS = roleEndpointRepository.list("secured_endpoint_id", securedEndpointId);
 
         RequestParams params = read(context, method);
 
@@ -116,14 +119,35 @@ public class SecuredEndpointInterceptor {
 
         List<String> acceptedAccess = extractAcceptedAccess(secured, params);
 
+        Set<String> normalizedEntitlements = entitlements.stream()
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+
         return ROLE_ENDPOINTS.stream()
                 .anyMatch(entry -> {
 
+                    String roleName =
+                            entry.getRoleName().toUpperCase();
+
                     return acceptedAccess.stream()
+                            .map(String::toUpperCase)
                             .anyMatch(access ->
-                                    entitlements.contains(entry.getRoleName() + ":" + access)
+                                    normalizedEntitlements.contains(
+                                            roleName + ":" + access
+                                    )
                             );
                 });
+
+        //
+
+//        return ROLE_ENDPOINTS.stream()
+//                .anyMatch(entry -> {
+//
+//                    return acceptedAccess.stream()
+//                            .anyMatch(access ->
+//                                    entitlements.contains(entry.getRoleName() + ":" + access)
+//                            );
+//                });
     }
 
     private List<String> extractAcceptedAccess(
@@ -157,6 +181,32 @@ public class SecuredEndpointInterceptor {
 
         return acceptedAccess;
     }
+//    private void processParams(
+//            Map<String, Object> values,
+//            Map<String, ParamRef> refMap,
+//            List<String> acceptedAccess
+//    ) {
+//
+//        for (var entry : values.entrySet()) {
+//
+//            ParamRef ref = refMap.get(entry.getKey());
+//            if (ref == null) continue;
+//
+//            Class<? extends ApiResource> resource = ref.referTo();
+//
+//            if (!resource.isEnum()) {
+//                throw new IllegalStateException(resource + " is not an enum");
+//            }
+//
+//            Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) resource;
+//
+//            String resourceType = enumClass.getEnumConstants()[0].name();
+//            String resourceValue = entry.getValue() + "-" + resourceType;
+//
+//            acceptedAccess.add(resourceValue);
+//        }
+//    }
+
     private void processParams(
             Map<String, Object> values,
             Map<String, ParamRef> refMap,
@@ -166,24 +216,101 @@ public class SecuredEndpointInterceptor {
         for (var entry : values.entrySet()) {
 
             ParamRef ref = refMap.get(entry.getKey());
-            if (ref == null) continue;
 
-            Class<? extends ApiResource> resource = ref.referTo();
-
-            if (!resource.isEnum()) {
-                throw new IllegalStateException(resource + " is not an enum");
+            if (ref == null) {
+                continue;
             }
 
-            Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) resource;
+            Class<? extends ApiResource> resource;
 
-            String resourceType = enumClass.getEnumConstants()[0].name();
-            String resourceValue = entry.getValue() + "-" + resourceType;
+            // Dynamic resource resolution
+            if (!ref.referToField().isBlank()) {
+
+                Object dynamicResourceValue =
+                        values.get(ref.referToField());
+
+                if (dynamicResourceValue == null) {
+                    throw new IllegalStateException(
+                            "Missing referToField value: "
+                                    + ref.referToField()
+                    );
+                }
+
+                resource = resolveResource(
+                        dynamicResourceValue.toString()
+                );
+
+            } else {
+
+                // Static resource resolution
+                resource = ref.referTo();
+            }
+
+            if (resource == null || resource == NoResource.class) {
+                throw new IllegalStateException(
+                        "No resource mapping configured for param: "
+                                + ref.param()
+                );
+            }
+
+            if (!resource.isEnum()) {
+                throw new IllegalStateException(
+                        resource + " is not an enum"
+                );
+            }
+
+            Class<? extends Enum<?>> enumClass =
+                    (Class<? extends Enum<?>>) resource;
+
+            String resourceType =
+                    enumClass.getEnumConstants()[0].name();
+
+            String resourceValue =
+                    resourceType + ":" + entry.getValue();
 
             acceptedAccess.add(resourceValue);
         }
     }
 
-        public class RequestParams {
+    @SuppressWarnings("unchecked")
+    private Class<? extends ApiResource> resolveResource(
+            String apiResource
+    ) {
+
+
+        var metadata = apiResourceHolder.getResources()
+                .stream()
+                .filter(r ->
+                        r.getResourceName()
+                                .equalsIgnoreCase(apiResource)
+                )
+                .findFirst()
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Unknown api resource: " + apiResource
+                        )
+                );
+
+        try {
+            Class<?> clazz =
+                    Thread.currentThread()
+                            .getContextClassLoader()
+                            .loadClass(metadata.getClassName());
+
+
+            return (Class<? extends ApiResource>) clazz;
+
+        } catch (ClassNotFoundException e) {
+
+            throw new RuntimeException(
+                    "Cannot load resource class: "
+                            + metadata.getClassName(),
+                    e
+            );
+        }
+    }
+
+    public class RequestParams {
 
         public final Map<String, Object> path = new HashMap<>();
         public final Map<String, Object> query = new HashMap<>();
@@ -191,6 +318,7 @@ public class SecuredEndpointInterceptor {
         public final List<Object> body = new ArrayList<>();
 
     }
+
     private Map<String, Object> extractBody(Object body) {
 
         if (body == null) {
@@ -209,7 +337,16 @@ public class SecuredEndpointInterceptor {
 
             for (Object item : iterable) {
                 Map<String, Object> extracted =
-                        objectMapper.convertValue(item, new TypeReference<Map<String, Object>>() {});
+                        null;
+                try {
+                    extracted = objectMapper.readValue(
+                            objectMapper.writeValueAsString(item),
+                            new TypeReference<Map<String, Object>>() {
+                            }
+                    );
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException(e);
+                }
                 result.putAll(extracted); // 🔥 flatten
             }
 
@@ -217,8 +354,10 @@ public class SecuredEndpointInterceptor {
         }
 
         // ✔ Case 3: normal object
-        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {});
+        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {
+        });
     }
+
     private boolean isSimpleType(Class<?> clazz) {
         return clazz.isPrimitive()
                 || clazz == String.class
@@ -226,6 +365,7 @@ public class SecuredEndpointInterceptor {
                 || clazz == Boolean.class
                 || clazz == Character.class;
     }
+
     public RequestParams read(InvocationContext context, Method method) {
 
         RequestParams result = new RequestParams();

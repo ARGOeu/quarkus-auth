@@ -149,13 +149,19 @@ public class ResourceAuthorizationService {
             throw new BadRequestException("api_resource exists and resource_id is empty!");
         } else {
 
-            apiResourceHolder
-                    .getData()
-                    .stream()
-                    .filter(r->r.getName().equals(request.apiResource))
-                    .findAny()
-                    .orElseThrow(()->new NotFoundException(request.apiResource+" not found!"));
+//            apiResourceHolder
+//                    .getData()
+//                    .stream()
+//                    .filter(r->r.getSimpleName().equals(request.apiResource))
+//                    .findAny()
+//                    .orElseThrow(()->new NotFoundException(request.apiResource+" not found!"));
 
+
+            apiResourceHolder.getData()
+                    .stream()
+                    .filter(r -> r.getResourceName().equals(request.apiResource))
+                    .findAny()
+                    .orElseThrow(() -> new NotFoundException(request.apiResource + " not found!"));
             authGroupManagement.assignResourceRoleToUser(request.username, request.role, request.apiResource, request.resourceId);
         }
 

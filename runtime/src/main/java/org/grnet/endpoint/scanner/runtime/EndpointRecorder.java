@@ -95,10 +95,13 @@ public class EndpointRecorder {
         };
     }
 
+
     public BeanContainerListener configureApiResourceBeanContainer(RuntimeValue<List<ApiResourceMetadata>> metadata) {
         return beanContainer -> {
+
             var bean = beanContainer.beanInstance(ApiResourceHolder.class);
             bean.setData(metadata.getValue());
+            bean.setResources(metadata.getValue());
         };
     }
 

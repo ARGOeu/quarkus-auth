@@ -13,5 +13,7 @@ public @interface ParamRef {
     ParamType type();
 
     Class<? extends ApiResource> referTo() default NoResource.class;
+    String referToField() default "";
+
 }
 
