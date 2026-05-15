@@ -88,7 +88,7 @@ public class SecuredEndpointInterceptor {
         );
 
         if (!hasAccess) {
-            throw new ForbiddenException("You cannot access this resource!");
+            throw new ForbiddenException("Access denied.");
         }
 
         return context.proceed();
