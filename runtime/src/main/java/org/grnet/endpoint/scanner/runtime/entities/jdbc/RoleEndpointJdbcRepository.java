@@ -19,7 +19,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
 
     @Override
     public List<RoleEndpoint> findAll() {
-        String sql = "SELECT * FROM role_endpoint";
+        String sql = "SELECT * FROM quarkus_auth.role_endpoint";
         List<RoleEndpoint> endpoints = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -48,7 +48,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
     }
 
     public RoleEndpoint findById(Long id) {
-        String sql = "SELECT * FROM role_endpoint WHERE id = ?";
+        String sql = "SELECT * FROM quarkus_auth.role_endpoint WHERE id = ?";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -79,7 +79,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
     }
 
     public void delete(Long id) {
-        String sql = "DELETE FROM role_endpoint WHERE id = ?";
+        String sql = "DELETE FROM quarkus_auth.role_endpoint WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
@@ -90,7 +90,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
     }
 
     public void deleteByRoleIdAndEndpointId(String roleId, String securedEndpointId) {
-        String sql = "DELETE FROM role_endpoint WHERE role_id = ? and secured_endpoint_id = ?";
+        String sql = "DELETE FROM quarkus_auth.role_endpoint WHERE role_id = ? and secured_endpoint_id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, roleId);
@@ -102,7 +102,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
     }
 
     public void deleteByRoleId(String roleId) {
-        String sql = "DELETE FROM role_endpoint WHERE role_id = ? ";
+        String sql = "DELETE FROM quarkus_auth.role_endpoint WHERE role_id = ? ";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, roleId);
@@ -122,7 +122,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
                 .map(id -> "?")
                 .collect(Collectors.joining(","));
 
-        String sql = "DELETE FROM role_endpoint WHERE role_id = ? AND secured_endpoint_id IN (" + placeholders + ")";
+        String sql = "DELETE FROM quarkus_auth.role_endpoint WHERE role_id = ? AND secured_endpoint_id IN (" + placeholders + ")";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -145,7 +145,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
             throw new IllegalArgumentException("Invalid column: " + column);
         }
 
-        String sql = "SELECT * FROM role_endpoint WHERE " + column + " = ?";
+        String sql = "SELECT * FROM quarkus_auth.role_endpoint WHERE " + column + " = ?";
 
         List<RoleEndpoint> results = new ArrayList<>();
 
@@ -194,7 +194,7 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
 
     public void create(RoleEndpoint entity) {
 
-        String sql = "INSERT INTO role_endpoint " +
+        String sql = "INSERT INTO quarkus_auth.role_endpoint " +
                 "(secured_endpoint_id, role_id,role_name) " +
                 "VALUES (?, ?,?)";
 
