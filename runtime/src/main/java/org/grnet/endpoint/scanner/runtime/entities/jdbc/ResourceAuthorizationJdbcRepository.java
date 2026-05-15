@@ -18,7 +18,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
     @Override
     public List<ResourceAuthorization> findAll() {
-        String sql = "SELECT * FROM resource_authorization";
+        String sql = "SELECT * FROM quarkus_auth.resource_authorization";
         List<ResourceAuthorization> users = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -50,7 +50,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
             throw new IllegalArgumentException("Invalid column: " + column);
         }
 
-        String sql = "SELECT * FROM resource_authorization WHERE " + column + " = ?";
+        String sql = "SELECT * FROM quarkus_auth.resource_authorization WHERE " + column + " = ?";
         List<ResourceAuthorization> results = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -86,7 +86,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
         return results;
     }
     public ResourceAuthorization findById(Long id) {
-        String sql = "SELECT * FROM resource_authorization WHERE id = ?";
+        String sql = "SELECT * FROM quarkus_auth.resource_authorization WHERE id = ?";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -116,7 +116,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
     @Override
     public void create(ResourceAuthorization entity) {
-        String sql = "INSERT INTO resource_authorization (secured_endpoint_id, rule, created_at) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO quarkus_auth.resource_authorization (secured_endpoint_id, rule, created_at) VALUES (?, ?, ?)";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -138,7 +138,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
         }
     }
     public void delete(Long id) {
-        String sql = "DELETE FROM resource_authorization WHERE id = ?";
+        String sql = "DELETE FROM quarkus_auth.resource_authorization WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
@@ -150,7 +150,7 @@ public class ResourceAuthorizationJdbcRepository implements ResourceAuthorizatio
 
     @Override
     public void update(Long id, String rule) {
-        String sql = "UPDATE resource_authorization SET rule = ?, created_at = ? WHERE id = ?";
+        String sql = "UPDATE quarkus_auth.resource_authorization SET rule = ?, created_at = ? WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 

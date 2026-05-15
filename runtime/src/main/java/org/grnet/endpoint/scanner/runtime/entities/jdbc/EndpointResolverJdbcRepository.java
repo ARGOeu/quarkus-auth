@@ -17,7 +17,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
 
     @Override
     public List<EndpointResolver> findAll() {
-        String sql = "SELECT * FROM endpoint_resolver";
+        String sql = "SELECT * FROM quarkus_auth.endpoint_resolver";
         List<EndpointResolver> resolvers = new ArrayList<>();
 
         try (Connection conn = dataSource.getConnection();
@@ -47,7 +47,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     }
 
     public EndpointResolver findById(Long id) {
-        String sql = "SELECT * FROM endpoint_resolver WHERE id = ?";
+        String sql = "SELECT * FROM quarkus_auth.endpoint_resolver WHERE id = ?";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -78,7 +78,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     }
 
     public void delete(Long id) {
-        String sql = "DELETE FROM endpoint_resolver WHERE id = ?";
+        String sql = "DELETE FROM quarkus_auth.endpoint_resolver WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
@@ -89,7 +89,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     }
 
     public void update(EndpointResolver re) {
-        String sql = "UPDATE endpoint_resolver SET original_field = ?, mapped_field = ? , created_at = ? WHERE id = ?";
+        String sql = "UPDATE quarkus_auth.endpoint_resolver SET original_field = ?, mapped_field = ? , created_at = ? WHERE id = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
 
@@ -111,7 +111,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
             throw new IllegalArgumentException("Invalid column: " + column);
         }
 
-        String sql = "SELECT * FROM endpoint_resolver WHERE " + column + " = ?";
+        String sql = "SELECT * FROM quarkus_auth.endpoint_resolver WHERE " + column + " = ?";
 
         List<EndpointResolver> results = new ArrayList<>();
 
@@ -159,7 +159,7 @@ public class EndpointResolverJdbcRepository implements EndpointResolverRepositor
     }
     public void create(EndpointResolver entity) {
 
-        String sql = "INSERT INTO endpoint_resolver " +
+        String sql = "INSERT INTO quarkus_auth.endpoint_resolver " +
                 "(secured_endpoint_id, resource, original_field, mapped_field) " +
                 "VALUES (?, ?, ?, ?)";
 
