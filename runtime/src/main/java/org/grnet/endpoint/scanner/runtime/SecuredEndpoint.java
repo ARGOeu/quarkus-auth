@@ -12,4 +12,6 @@ import java.lang.annotation.Target;
 public @interface SecuredEndpoint {
 
     ParamRef[] params() default {};
+    boolean bypass() default false;
+
 }

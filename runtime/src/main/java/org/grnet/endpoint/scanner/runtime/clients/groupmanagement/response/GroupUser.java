@@ -18,19 +18,13 @@ public class GroupUser {
 
     public Attributes attributes;
 
-    @JsonGetter("tenants")
-    public List<UserGroupInfoDto> getTenants() {
 
-        return Collections.emptyList();
 
-//        if (attributes != null && attributes.getLocalEntitlements() != null) {
-//
-//            return CDI.current()
-//                    .select(UserEntitlementsService.class)
-//                    .get()
-//                    .parseLocalEntitlements(attributes.getLocalEntitlements(), "tenants");
-//        } else {
-//            return Collections.emptyList();
-//        }
+    @JsonGetter("uid")
+    public String getUid() {
+        if (attributes == null || attributes.uid == null || attributes.uid.isEmpty()) {
+            return null;
+        }
+        return attributes.uid.get(0);
     }
 }
