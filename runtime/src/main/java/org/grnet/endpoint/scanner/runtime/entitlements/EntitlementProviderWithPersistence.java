@@ -1,6 +1,7 @@
 package org.grnet.endpoint.scanner.runtime.entitlements;
 
 import jakarta.inject.Inject;
+import org.grnet.endpoint.scanner.runtime.SecuredEndpointConfig;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.OidcEntitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.PersistenceEntitlement;
 
@@ -19,6 +20,9 @@ public class EntitlementProviderWithPersistence implements EntitlementProvider{
     @PersistenceEntitlement
     EntitlementService persistenceEntitlementService;
 
+    @Inject
+    SecuredEndpointConfig config;
+
     @Override
     public List<Entitlement> fetchEntitlements() {
 
@@ -32,5 +36,13 @@ public class EntitlementProviderWithPersistence implements EntitlementProvider{
 
             return persistenceEntitlementService.fetchEntitlements();
         }
+    }
+
+    @Override
+    public boolean isSuperAdmin() {
+        return fetchEntitlements()
+                .stream()
+                .anyMatch(entitlement -> entitlement.getGroup().equals(config.parentGroup()) && entitlement.getRole().equals(config.superAdminRole()));
+
     }
 }

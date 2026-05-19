@@ -11,6 +11,7 @@ import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpointRepository;
@@ -47,8 +48,6 @@ public class SecuredEndpointInterceptor {
     @Inject
     RoleEndpointRepository roleEndpointRepository;
     @Inject
-    SecuredEndpointConfig config;
-    @Inject
     ApiResourceHolder apiResourceHolder;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
@@ -58,7 +57,7 @@ public class SecuredEndpointInterceptor {
     @AroundInvoke
     public Object checkAccess(InvocationContext context) throws Exception {
 
-        if (entitlementProvider.isSuperAdmin(config)) {
+        if (entitlementProvider.isSuperAdmin()) {
             return context.proceed();
         }
 
@@ -82,7 +81,6 @@ public class SecuredEndpointInterceptor {
 
         boolean hasAccess = checkEntitlement(
                 entitlements,
-                securedEndpointId,
                 secured,
                 params
         );
@@ -112,7 +110,6 @@ public class SecuredEndpointInterceptor {
 
     private boolean checkEntitlement(
             List<String> entitlements,
-            String securedEndpointId,
             SecuredEndpoint secured,
             RequestParams params
     ) {
@@ -128,7 +125,14 @@ public class SecuredEndpointInterceptor {
 
                     String roleName =
                             entry.getRoleName().toUpperCase();
-
+                    // No params/access rules → role-only check
+                    if (acceptedAccess.isEmpty()) {
+                        return normalizedEntitlements.stream()
+                                .anyMatch(entitlement ->
+                                        entitlement.contains(roleName)
+                                );
+                    }
+                    // Param/resource-based check
                     return acceptedAccess.stream()
                             .map(String::toUpperCase)
                             .anyMatch(access ->
@@ -137,17 +141,6 @@ public class SecuredEndpointInterceptor {
                                     )
                             );
                 });
-
-        //
-
-//        return ROLE_ENDPOINTS.stream()
-//                .anyMatch(entry -> {
-//
-//                    return acceptedAccess.stream()
-//                            .anyMatch(access ->
-//                                    entitlements.contains(entry.getRoleName() + ":" + access)
-//                            );
-//                });
     }
 
     private List<String> extractAcceptedAccess(
@@ -319,43 +312,86 @@ public class SecuredEndpointInterceptor {
 
     }
 
+//    private Map<String, Object> extractBody(Object body) {
+//
+//        if (body == null) {
+//            return Map.of();
+//        }
+//
+//        // ✔ Case 1: already a Map
+//        if (body instanceof Map<?, ?> map) {
+//            return (Map<String, Object>) map;
+//        }
+//
+//        // ✔ Case 2: Collection (List, etc)
+//        if (body instanceof Iterable<?> iterable) {
+//
+//            Map<String, Object> result = new HashMap<>();
+//
+//            for (Object item : iterable) {
+//                Map<String, Object> extracted =
+//                        null;
+//                try {
+//                    extracted = objectMapper.readValue(
+//                            objectMapper.writeValueAsString(item),
+//                            new TypeReference<Map<String, Object>>() {
+//                            }
+//                    );
+//                } catch (JsonProcessingException e) {
+//                    throw new RuntimeException(e);
+//                }
+//                result.putAll(extracted); // 🔥 flatten
+//            }
+//
+//            return result;
+//        }
+//
+//        // ✔ Case 3: normal object
+//        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {
+//        });
+//    }
+
     private Map<String, Object> extractBody(Object body) {
 
         if (body == null) {
             return Map.of();
         }
 
-        // ✔ Case 1: already a Map
         if (body instanceof Map<?, ?> map) {
             return (Map<String, Object>) map;
         }
 
-        // ✔ Case 2: Collection (List, etc)
         if (body instanceof Iterable<?> iterable) {
 
             Map<String, Object> result = new HashMap<>();
 
             for (Object item : iterable) {
-                Map<String, Object> extracted =
-                        null;
-                try {
-                    extracted = objectMapper.readValue(
-                            objectMapper.writeValueAsString(item),
-                            new TypeReference<Map<String, Object>>() {
-                            }
-                    );
-                } catch (JsonProcessingException e) {
-                    throw new RuntimeException(e);
+
+                if (item == null) {
+                    continue;
                 }
-                result.putAll(extracted); // 🔥 flatten
+
+                // skip framework objects
+                if (item instanceof UriInfo) {
+                    continue;
+                }
+
+                Map<String, Object> extracted =
+                        objectMapper.convertValue(
+                                item,
+                                new TypeReference<Map<String, Object>>() {}
+                        );
+
+                result.putAll(extracted);
             }
 
             return result;
         }
 
-        // ✔ Case 3: normal object
-        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {
-        });
+        return objectMapper.convertValue(
+                body,
+                new TypeReference<Map<String, Object>>() {}
+        );
     }
 
     private boolean isSimpleType(Class<?> clazz) {
@@ -365,6 +401,40 @@ public class SecuredEndpointInterceptor {
                 || clazz == Boolean.class
                 || clazz == Character.class;
     }
+
+//    public RequestParams read(InvocationContext context, Method method) {
+//
+//        RequestParams result = new RequestParams();
+//
+//        Parameter[] params = method.getParameters();
+//        Object[] values = context.getParameters();
+//
+//        for (int i = 0; i < params.length; i++) {
+//
+//            Parameter p = params[i];
+//            Object value = values[i];
+//
+//            if (p.isAnnotationPresent(PathParam.class)) {
+//                result.path.put(p.getAnnotation(PathParam.class).value(), value);
+//                continue;
+//            }
+//
+//            if (p.isAnnotationPresent(QueryParam.class)) {
+//                result.query.put(p.getAnnotation(QueryParam.class).value(), value);
+//                continue;
+//            }
+//
+//            if (p.isAnnotationPresent(HeaderParam.class)) {
+//                result.header.put(p.getAnnotation(HeaderParam.class).value(), value);
+//                continue;
+//            }
+//
+//            // BODY fallback
+//            result.body.add(value);
+//        }
+//
+//        return result;
+//    }
 
     public RequestParams read(InvocationContext context, Method method) {
 
@@ -390,6 +460,15 @@ public class SecuredEndpointInterceptor {
 
             if (p.isAnnotationPresent(HeaderParam.class)) {
                 result.header.put(p.getAnnotation(HeaderParam.class).value(), value);
+                continue;
+            }
+
+            // SKIP framework/context params
+            if (p.isAnnotationPresent(Context.class)
+                    || value instanceof UriInfo
+                    || value instanceof jakarta.ws.rs.core.SecurityContext
+                    || value instanceof jakarta.ws.rs.core.HttpHeaders
+                    || value instanceof jakarta.ws.rs.container.ContainerRequestContext) {
                 continue;
             }
 
