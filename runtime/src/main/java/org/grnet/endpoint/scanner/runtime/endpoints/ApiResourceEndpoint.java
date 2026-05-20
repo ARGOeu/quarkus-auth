@@ -95,53 +95,6 @@ public class ApiResourceEndpoint {
         return Response.ok().entity(resources).build();
     }
 
-    @Tag(name = "Api Resources")
-    @Operation(
-            summary = "Assign a new role to user.",
-            description = "Assign a new role to user."
-    )
-    @APIResponse(
-            responseCode = "200",
-            description = "Role assigned successfully.",
-            content = @Content(schema = @Schema(
-                    type = SchemaType.OBJECT,
-                    implementation = Object.class)))
-    @APIResponse(
-            responseCode = "401",
-            description = "User has not been authenticated.",
-            content = @Content(schema = @Schema(
-                    type = SchemaType.OBJECT,
-                    implementation = Object.class)))
-    @APIResponse(
-            responseCode = "403",
-            description = "Not permitted.",
-            content = @Content(schema = @Schema(
-                    type = SchemaType.OBJECT,
-                    implementation = Object.class)))
-    @APIResponse(
-            responseCode = "500",
-            description = "Internal Server Error.",
-            content = @Content(schema = @Schema(
-                    type = SchemaType.OBJECT,
-                    implementation = Object.class)))
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-    @SecuredEndpoint(
-            params = {
-                    @ParamRef(
-                            param = "resource_id",
-                            type = ParamType.BODY,
-                            referToField = "api_resource"
-                    )
-            }
-    )
-    public Response assignRoleToUser(@Valid @NotNull(message = "The request body is empty.") AssignRoleRequest request) {
-
-        var resources = resourceAuthorizationService.assignRoleToUser(request);
-
-        return Response.ok().entity(resources).build();
-    }
-
     public static class PageableApiResources extends PageResource<ApiResourceMetadata> {
 
         private List<ApiResourceMetadata> content;

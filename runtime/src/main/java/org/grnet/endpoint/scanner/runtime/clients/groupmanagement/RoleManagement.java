@@ -46,6 +46,11 @@ public interface RoleManagement {
      */
     void assignGlobalRoleToUser(String username, String role);
 
+    void revokeGlobalRoleFromUser(String memberId, String role);
+
+    void revokeResourceRoleFromUser(String memberId, String role, String resource, String id);
+
+
     /**
      * Creates a new role within the role management system.
      *

@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -26,6 +27,8 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.grnet.endpoint.scanner.runtime.ParamRef;
+import org.grnet.endpoint.scanner.runtime.ParamType;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
@@ -136,6 +139,102 @@ public class RoleEndpoint {
         var resources = resourceAuthorizationService.getAllRolesByPageAndSize(page - 1, size, uriInfo);
 
         return Response.ok().entity(resources).build();
+    }
+
+    @Tag(name = "Roles")
+    @Operation(
+            summary = "Assign a new role to user.",
+            description = "Assign a new role to user."
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Role assigned successfully.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @POST
+    @Path("/assign")
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint(
+            params = {
+                    @ParamRef(
+                            param = "resource_id",
+                            type = ParamType.BODY,
+                            referToField = "api_resource"
+                    )
+            }
+    )
+    public Response assignRoleToUser(@Valid @NotNull(message = "The request body is empty.") AssignRoleRequest request) {
+
+        var resources = resourceAuthorizationService.assignRoleToUser(request);
+
+        return Response.ok().entity(resources).build();
+    }
+
+    @Tag(name = "Roles")
+    @Operation(
+            summary = "Revoke a role from a member.",
+            description = "Revoke a role from a member."
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Role revoked successfully.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @DELETE
+    @Path("/revoke")
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint(
+            params = {
+                    @ParamRef(
+                            param = "resource_id",
+                            type = ParamType.BODY,
+                            referToField = "api_resource"
+                    )
+            }
+    )
+    public Response revokeRoleFromUser(@Valid @NotNull(message = "The request body is empty.") RevokeRoleRequest request) {
+
+        var response = resourceAuthorizationService.revokeRoleFromUser(request);
+
+        return Response.ok().entity(response).build();
     }
 
     public static class PageableRoleResponse extends PageResource<RoleResponse> {
