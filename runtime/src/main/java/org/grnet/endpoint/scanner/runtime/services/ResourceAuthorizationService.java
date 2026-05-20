@@ -15,6 +15,7 @@ import org.grnet.endpoint.scanner.runtime.endpoints.AssignRoleRequest;
 import org.grnet.endpoint.scanner.runtime.endpoints.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.endpoints.InformativeResponse;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
+import org.grnet.endpoint.scanner.runtime.endpoints.RevokeRoleRequest;
 import org.grnet.endpoint.scanner.runtime.endpoints.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.endpoints.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
@@ -128,6 +129,32 @@ public class ResourceAuthorizationService {
         event.select(new AfterProcessing.Literal("assign-role")).fire(roleEvent);
 
         return roleEvent.getResult();
+    }
+
+    public InformativeResponse revokeRoleFromUser(RevokeRoleRequest request){
+
+        var response = new InformativeResponse();
+        response.code = 200;
+        response.message = "Role revoked successfully!";
+
+        if(StringUtils.isEmpty(request.apiResource)){
+
+            authGroupManagement.revokeGlobalRoleFromUser(request.memberId, request.role);
+        } else if(StringUtils.isNotEmpty(request.apiResource) && StringUtils.isEmpty(request.resourceId)) {
+
+            throw new BadRequestException("api_resource exists and resource_id is empty!");
+        } else {
+
+            apiResourceHolder.getData()
+                    .stream()
+                    .filter(r -> r.getResourceName().equals(request.apiResource))
+                    .findAny()
+                    .orElseThrow(() -> new NotFoundException(request.apiResource + " not found!"));
+
+            authGroupManagement.revokeResourceRoleFromUser(request.memberId, request.role, request.apiResource, request.resourceId);
+        }
+
+        return response;
     }
 
     public void createNewRole(CreateRoleRequest request){

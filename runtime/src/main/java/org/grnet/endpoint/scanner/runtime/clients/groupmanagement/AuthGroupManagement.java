@@ -234,6 +234,21 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     }
 
     @Override
+    public void revokeGlobalRoleFromUser(String memberId, String role) {
+
+        var parentPath = "/" + parentGroup + "/" + role;
+
+        removeMemberFromGroup(parentPath, memberId);
+    }
+
+    @Override
+    public void revokeResourceRoleFromUser(String memberId, String role, String resource, String id) {
+
+        var parentPath = "/" + parentGroup + "/" + role + "/"+ resource+"/"+id;
+        removeMemberFromGroup(parentPath, memberId);
+    }
+
+    @Override
     public void assignResourceRoleToUser(String username, String role, String resource, String id){
 
         var specificResourcePath = "/" + parentGroup + "/" + role + "/"+ resource+"/"+id;
