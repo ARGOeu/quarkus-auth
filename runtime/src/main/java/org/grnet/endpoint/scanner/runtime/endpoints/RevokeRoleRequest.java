@@ -44,5 +44,6 @@ public class RevokeRoleRequest {
             example = "joe_doe"
     )
     @NotEmpty(message = "member_id may not be empty.")
+    @JsonProperty("member_id")
     public String memberId;
 }
