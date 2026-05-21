@@ -27,6 +27,7 @@ import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakTokenC
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUserResponse;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.UserGroupInfoDto;
+import org.grnet.endpoint.scanner.runtime.context.RoleEndpointContext;
 import org.grnet.endpoint.scanner.runtime.endpoints.ApiResourceEndpoint;
 import org.grnet.endpoint.scanner.runtime.endpoints.AssignRoleRequest;
 import org.grnet.endpoint.scanner.runtime.endpoints.CreateRoleRequest;
@@ -300,7 +301,8 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(GroupIdResolver.class),
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class));
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class),
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class));
     }
 
     @BuildStep

@@ -13,6 +13,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
+import org.grnet.endpoint.scanner.runtime.context.RoleEndpointContext;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpointRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
@@ -50,9 +51,11 @@ public class SecuredEndpointInterceptor {
     @Inject
     ApiResourceHolder apiResourceHolder;
 
-    private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
-    private static List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
+    @Inject
+    RoleEndpointContext roleEndpointContext;
 
+    private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
+    private List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
 
     @AroundInvoke
     public Object checkAccess(InvocationContext context) throws Exception {
@@ -76,6 +79,8 @@ public class SecuredEndpointInterceptor {
         );
 
         ROLE_ENDPOINTS = roleEndpointRepository.list("secured_endpoint_id", securedEndpointId);
+
+        roleEndpointContext.setRoleEndpoints(ROLE_ENDPOINTS);
 
         RequestParams params = read(context, method);
 
