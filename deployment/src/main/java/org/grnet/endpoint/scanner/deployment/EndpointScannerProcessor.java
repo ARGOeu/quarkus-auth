@@ -19,6 +19,7 @@ import org.grnet.endpoint.scanner.runtime.ApiResourceMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
 import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
+import org.grnet.endpoint.scanner.runtime.Scope;
 import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsTokenProvider;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
@@ -79,6 +80,7 @@ import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
 import org.grnet.endpoint.scanner.runtime.services.Utility;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
+import org.jboss.jandex.AnnotationValue;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.ClassType;
 import org.jboss.jandex.DotName;
@@ -91,6 +93,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -188,7 +192,16 @@ class EndpointScannerProcessor {
                 }
             }
 
-            addEndpoint(endpoints, new EndpointMetadata(generateSecuredEndpointId(httpMethod, fullPath), httpMethod, fullPath, description));
+            Set<Scope> scopes = new HashSet<>();
+
+            var scopeValue = annotation.value("scope");
+            if (scopeValue != null) {
+                Arrays.stream(scopeValue.asEnumArray())
+                        .map(Scope::valueOf)
+                        .forEach(scopes::add);
+            }
+
+            addEndpoint(endpoints, new EndpointMetadata(generateSecuredEndpointId(httpMethod, fullPath), httpMethod, fullPath, description, scopes));
         }
 
         return new EndpointMetadataBuildItem(endpoints);
@@ -278,6 +291,7 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(UserProfileDto.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleResponse.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.PageableRoleResponse.class.getName()));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Scope.class.getName()));
     }
 
     @BuildStep

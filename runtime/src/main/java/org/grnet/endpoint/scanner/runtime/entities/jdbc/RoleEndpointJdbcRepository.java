@@ -35,7 +35,8 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
                         rs.getString("role_name"),
                         rs.getString("role_id"),
                         rs.getString("secured_endpoint_id"),
-                        createdAt
+                        createdAt,
+                        rs.getString("scope")
                 );
                 endpoints.add(endpoint);
             }
@@ -66,7 +67,8 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
                             rs.getString("role_name"),
                             rs.getString("secured_endpoint_id"),
                             rs.getString("role_id"),
-                            createdAt
+                            createdAt,
+                            rs.getString("scope")
                     );
                 }
             }
@@ -179,7 +181,8 @@ public class RoleEndpointJdbcRepository implements RoleEndpointRepository {
                             rs.getString("role_name"),
                             rs.getString("role_id"),
                             rs.getString("secured_endpoint_id"),
-                            createdAt
+                            createdAt,
+                            rs.getString("scope")
                     );
                     results.add(roleEndpoint);
                 }
