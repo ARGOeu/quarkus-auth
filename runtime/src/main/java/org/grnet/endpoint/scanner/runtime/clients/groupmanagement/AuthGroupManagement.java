@@ -36,18 +36,36 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
     private static final Logger LOG = Logger.getLogger(AuthGroupManagement.class);
 
-    private final KeycloakGroupManagementClient groupClient;
+    private volatile KeycloakGroupManagementClient groupClient;
 
     private final String parentGroup;
 
+    private final String url;
+
+    private final BearerTokenRequestFilter filter;
+
+
     public AuthGroupManagement(String url, BearerTokenRequestFilter filter, String parentGroup) {
         this.parentGroup = parentGroup;
-        this.groupClient = QuarkusRestClientBuilder.newBuilder()
-                .baseUri(URI.create(url))
-                .register(KeycloakExceptionMapper.class)
-                .register(filter)
-                .build(KeycloakGroupManagementClient.class);
+        this.url = url;
+        this.filter = filter;
     }
+
+    private KeycloakGroupManagementClient getGroupClient() {
+        if (groupClient == null) {
+            synchronized (this) {
+                if (groupClient == null) {
+                    groupClient = QuarkusRestClientBuilder.newBuilder()
+                            .baseUri(URI.create(url))
+                            .register(KeycloakExceptionMapper.class)
+                            .register(filter)
+                            .build(KeycloakGroupManagementClient.class);
+                }
+            }
+        }
+        return groupClient;
+    }
+
 
     // ---------------------------------------------------------
     // CREATE GROUP
@@ -70,7 +88,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
             throw new IllegalStateException("Creating group failed. Parent group not found at path: " + parentPath);
 
         // Create child group
-        groupClient.createSubGroup(parentId, req);
+        getGroupClient().createSubGroup(parentId, req);
 
         // Resolve new group ID (path-based)
         var newGroupPath = parentPath + "/" + name;
@@ -84,7 +102,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
             // Assign roles
             for (String role : roles) {
-                groupClient.addRole(newGroupId, role);
+                getGroupClient().addRole(newGroupId, role);
             }
 
             // Update the group configuration with roles
@@ -100,7 +118,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         try {
             var id = getGroupIdByPath(fullGroupPath);
             if (id != null) {
-                groupClient.deleteGroup(id);
+                getGroupClient().deleteGroup(id);
             } else {
                 LOG.warnf("Group not found for deletion: %s", fullGroupPath);
             }
@@ -141,13 +159,13 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groupId = getGroupIdByPath(fullPath);
 
-        var response = groupClient.getGroupMembers(groupId, 0, 10, username);
+        var response = getGroupClient().getGroupMembers(groupId, 0, 10, username);
 
         if(response.count>0){
             return;
         }
 
-        groupClient.addUserToGroup(groupId, new AddGroupMemberRequest(username, List.of("member")));
+        getGroupClient().addUserToGroup(groupId, new AddGroupMemberRequest(username, List.of("member")));
     }
 
     @Override
@@ -155,7 +173,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groupId = getGroupIdByPath(fullPath);
 
-        return groupClient.getGroupMembers(groupId, first, max, search);
+        return getGroupClient().getGroupMembers(groupId, first, max, search);
     }
 
     /**
@@ -171,7 +189,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groupId = getGroupIdByPath(parentGroupId);
 
-        var group = groupClient.getGroup(groupId);
+        var group = getGroupClient().getGroup(groupId);
 
         return group.extraSubGroups.stream().map(gr -> new RoleResponse(gr.id, gr.name)).collect(Collectors.toList());
     }
@@ -181,7 +199,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     // ---------------------------------------------------------
     @Override
     public void addRole(String groupId, String role) {
-        groupClient.addRole(groupId, role);
+        getGroupClient().addRole(groupId, role);
     }
 
     // ---------------------------------------------------------
@@ -200,7 +218,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         LOG.infof("AGM getMembersByRole fullPath=%s groupId=%s role=%s", fullPath, groupId, role);
 
 
-        var response = groupClient.getMembersByRole(groupId, role);
+        var response = getGroupClient().getMembersByRole(groupId, role);
 
         if (response == null || response.results == null) {
             return List.of();
@@ -216,13 +234,13 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groupId = getGroupIdByPath(fullPath);
 
-        var response = groupClient.getGroupMembers(groupId, 0, 10, username);
+        var response = getGroupClient().getGroupMembers(groupId, 0, 10, username);
 
         if(response.count>0){
             return;
         }
 
-        groupClient.addUserToGroup(groupId, new AddGroupMemberRequest(username, List.of(role)));
+        getGroupClient().addUserToGroup(groupId, new AddGroupMemberRequest(username, List.of(role)));
     }
 
     @Override
@@ -275,19 +293,19 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     @Override
     public void addMemberToGroupByGroupId(String id, String username, String role) {
 
-        var response = groupClient.getGroupMembers(id, 0, 10, username);
+        var response = getGroupClient().getGroupMembers(id, 0, 10, username);
 
         if (response.count>0) {
             return;
         }
 
-        groupClient.addUserToGroup(id, new AddGroupMemberRequest(username, List.of(role)));
+        getGroupClient().addUserToGroup(id, new AddGroupMemberRequest(username, List.of(role)));
     }
 
     private void updateGroupConfigurationRoles(String groupId, List<String> roles) {
 
         // Fetch full group structure
-        var group = groupClient.getGroup(groupId);
+        var group = getGroupClient().getGroup(groupId);
 
         // Obtain defaultConfiguration ID
         var configId = group.attributes
@@ -295,13 +313,13 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
                 .get(0);
 
         // Fetch complete configuration JSON object
-        var config = groupClient.getConfiguration(groupId, configId);
+        var config = getGroupClient().getConfiguration(groupId, configId);
 
         // Assign new roles
         config.setGroupRoles(roles);
 
         // Update configuration
-        groupClient.updateConfiguration(groupId, config);
+        getGroupClient().updateConfiguration(groupId, config);
 
         LOG.infof("Updated roles for group %s → %s", groupId, roles);
     }
@@ -321,7 +339,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
     // Builds a map of all groups (path → id, id → defaultConfigId) by flattening the Keycloak tree
     private Map<String, String> flattenGroups() {
-        var response = groupClient.getGroups("");
+        var response = getGroupClient().getGroups("");
         Map<String, String> map = new HashMap<>();
 
         for (Group group : response.results) {
@@ -335,7 +353,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groups = new ArrayList<PartialGroup>();
 
-        var response = groupClient.getGroups("");
+        var response = getGroupClient().getGroups("");
 
         for (Group group : response.results) {
             collectGroupRecursive(group, groups);
@@ -348,7 +366,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var groupId = getGroupIdByPath(fullPath);
 
-        groupClient.removeMemberFromGroup(groupId, memberId);
+        getGroupClient().removeMemberFromGroup(groupId, memberId);
     }
 
     // Recursively adds a group's path, id, and default configuration to the lookup map
