@@ -9,23 +9,33 @@ import java.net.URI;
 
 public class KeycloakClientCredentialsTokenProvider{
 
-    private KeycloakTokenClient tokenClient;
+    private volatile KeycloakTokenClient tokenClient;
 
-    String clientId;
-
-    String clientSecret;
+    private final String url;
+    private final String clientId;
+    private final String clientSecret;
 
     public KeycloakClientCredentialsTokenProvider(String url, String clientId, String clientSecret) {
-        this.tokenClient = QuarkusRestClientBuilder.newBuilder()
-                .baseUri(URI.create(url))
-                .build(KeycloakTokenClient.class);
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        this.url = url;
+    }
+
+    private KeycloakTokenClient getTokenClient() {
+        if (tokenClient == null) {
+            synchronized (this) {
+                if (tokenClient == null) {
+                    tokenClient = QuarkusRestClientBuilder.newBuilder()
+                            .baseUri(URI.create(url))
+                            .build(KeycloakTokenClient.class);
+                }
+            }
+        }
+        return tokenClient;
     }
 
     public String getAccessToken() {
-
-        return tokenClient
+        return getTokenClient()
                 .getToken("client_credentials", clientId, clientSecret)
                 .access_token;
     }
