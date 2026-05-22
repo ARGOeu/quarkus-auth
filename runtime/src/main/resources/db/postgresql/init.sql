@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS quarkus_auth.endpoint_resolver (
     );
 
 CREATE TABLE IF NOT EXISTS quarkus_auth.role_endpoint (
-                                                          id SERIAL PRIMARY KEY,
-                                                          role_name VARCHAR(255) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    role_name VARCHAR(255) NOT NULL,
     role_id VARCHAR(255) NOT NULL,
     secured_endpoint_id VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (secured_endpoint_id, role_id)
     );
+
+ALTER TABLE quarkus_auth.role_endpoint ADD COLUMN IF NOT EXISTS scope VARCHAR(50) NULL;

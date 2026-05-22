@@ -9,15 +9,18 @@ public class RoleEndpoint {
     private String securedEndpointId;
     private LocalDateTime createdAt;
 
+    private String scope;
+
     public RoleEndpoint() {
     }
 
-    public RoleEndpoint(Long id,String roleName, String roleId, String securedEndpointId,LocalDateTime createdAt) {
+    public RoleEndpoint(Long id,String roleName, String roleId, String securedEndpointId, LocalDateTime createdAt, String scope) {
         this.id = id;
         this.roleId = roleId;
         this.roleName = roleName;
         this.securedEndpointId = securedEndpointId;
-        this.createdAt=createdAt;
+        this.createdAt = createdAt;
+        this.scope = scope;
     }
 
     public String getRoleName() {
@@ -58,5 +61,13 @@ public class RoleEndpoint {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public void setScope(String scope) {
+        this.scope = scope;
     }
 }

@@ -1,10 +1,8 @@
 package org.grnet.endpoint.scanner.runtime;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Priority;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
@@ -18,16 +16,12 @@ import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpointRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
-import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
-import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.jboss.logging.Logger;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -179,31 +173,6 @@ public class SecuredEndpointInterceptor {
 
         return acceptedAccess;
     }
-//    private void processParams(
-//            Map<String, Object> values,
-//            Map<String, ParamRef> refMap,
-//            List<String> acceptedAccess
-//    ) {
-//
-//        for (var entry : values.entrySet()) {
-//
-//            ParamRef ref = refMap.get(entry.getKey());
-//            if (ref == null) continue;
-//
-//            Class<? extends ApiResource> resource = ref.referTo();
-//
-//            if (!resource.isEnum()) {
-//                throw new IllegalStateException(resource + " is not an enum");
-//            }
-//
-//            Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) resource;
-//
-//            String resourceType = enumClass.getEnumConstants()[0].name();
-//            String resourceValue = entry.getValue() + "-" + resourceType;
-//
-//            acceptedAccess.add(resourceValue);
-//        }
-//    }
 
     private void processParams(
             Map<String, Object> values,
@@ -317,45 +286,6 @@ public class SecuredEndpointInterceptor {
 
     }
 
-//    private Map<String, Object> extractBody(Object body) {
-//
-//        if (body == null) {
-//            return Map.of();
-//        }
-//
-//        // ✔ Case 1: already a Map
-//        if (body instanceof Map<?, ?> map) {
-//            return (Map<String, Object>) map;
-//        }
-//
-//        // ✔ Case 2: Collection (List, etc)
-//        if (body instanceof Iterable<?> iterable) {
-//
-//            Map<String, Object> result = new HashMap<>();
-//
-//            for (Object item : iterable) {
-//                Map<String, Object> extracted =
-//                        null;
-//                try {
-//                    extracted = objectMapper.readValue(
-//                            objectMapper.writeValueAsString(item),
-//                            new TypeReference<Map<String, Object>>() {
-//                            }
-//                    );
-//                } catch (JsonProcessingException e) {
-//                    throw new RuntimeException(e);
-//                }
-//                result.putAll(extracted); // 🔥 flatten
-//            }
-//
-//            return result;
-//        }
-//
-//        // ✔ Case 3: normal object
-//        return objectMapper.convertValue(body, new TypeReference<Map<String, Object>>() {
-//        });
-//    }
-
     private Map<String, Object> extractBody(Object body) {
 
         if (body == null) {
@@ -407,39 +337,6 @@ public class SecuredEndpointInterceptor {
                 || clazz == Character.class;
     }
 
-//    public RequestParams read(InvocationContext context, Method method) {
-//
-//        RequestParams result = new RequestParams();
-//
-//        Parameter[] params = method.getParameters();
-//        Object[] values = context.getParameters();
-//
-//        for (int i = 0; i < params.length; i++) {
-//
-//            Parameter p = params[i];
-//            Object value = values[i];
-//
-//            if (p.isAnnotationPresent(PathParam.class)) {
-//                result.path.put(p.getAnnotation(PathParam.class).value(), value);
-//                continue;
-//            }
-//
-//            if (p.isAnnotationPresent(QueryParam.class)) {
-//                result.query.put(p.getAnnotation(QueryParam.class).value(), value);
-//                continue;
-//            }
-//
-//            if (p.isAnnotationPresent(HeaderParam.class)) {
-//                result.header.put(p.getAnnotation(HeaderParam.class).value(), value);
-//                continue;
-//            }
-//
-//            // BODY fallback
-//            result.body.add(value);
-//        }
-//
-//        return result;
-//    }
 
     public RequestParams read(InvocationContext context, Method method) {
 
@@ -493,12 +390,6 @@ public class SecuredEndpointInterceptor {
         try {
             var resolvedRule = rule;
 
-//            // 1️⃣ Resolve dynamic placeholders via resolvers
-//            if (resolvedRule.contains("{")) {
-//                resolvedRule = resolveRegex(securedEndpointId, method, resolvedRule);
-//            }
-
-            // 2️⃣ Replace path parameters with actual values (escaped for regex)
             for (Map.Entry<String, String> entry : pathParams.entrySet()) {
                 resolvedRule = resolvedRule.replace(
                         "{" + entry.getKey() + "}",
@@ -506,14 +397,8 @@ public class SecuredEndpointInterceptor {
                 );
             }
 
-            // 3️⃣ If no regex wildcards, escape rule for literal match
-//            if (!resolvedRule.contains(".*") && !resolvedRule.contains("^") && !resolvedRule.contains("$")) {
-//                resolvedRule = Pattern.quote(resolvedRule);
-//            }
-
             var pattern = Pattern.compile(resolvedRule);
 
-            // 4️⃣ Match against all entitlements
             return entitlements.stream()
                     .anyMatch(e ->
 
@@ -565,30 +450,6 @@ public class SecuredEndpointInterceptor {
         return path.replaceAll("//+", "/");
     }
 
-//    private String resolveRegex(String securedEndpointId, Method method, String regex) {
-//        var endpoint = method.getAnnotation(SecuredEndpoint.class);
-//        var resolverDefs = endpoint.resolvers();
-//
-//        var resolvedRule = regex;
-//        for (TestResolver resolverDef : resolverDefs) {
-//            Class<? extends TestGroupIdResolver> resolverClass = resolverDef.idResolver();
-//            String pathId = resolverDef.pathId();
-//
-//            TestGroupIdResolver resolver = resolverInstances.select(resolverClass).get();
-//            List<EndpointMetadata> endpoints = endpointMetadataHolder.getData();
-//            String resource = endpoints.stream()
-//                    .filter(e -> e.getSecuredEndpointId().equals(securedEndpointId))
-//                    .findFirst()
-//                    .map(e -> resolveResourceFromPath(e.getPath(), pathId))
-//                    .orElseThrow(() -> new IllegalStateException(
-//                            "No endpoint metadata found for securedEndpointId " + securedEndpointId));
-//
-//            String resolvedValue = resolver.resolve(securedEndpointId, resource, pathId);
-//            resolvedRule = resolvedRule.replace("{" + pathId + "}", resolvedValue);
-//        }
-//        return resolvedRule;
-//    }
-
     private String resolveResourceFromPath(String fullPath, String pathId) {
         var segments = fullPath.split("/");
         for (int i = 0; i < segments.length; i++) {
@@ -619,6 +480,4 @@ public class SecuredEndpointInterceptor {
             throw new RuntimeException("Cannot read request body", e);
         }
     }
-
-
 }
