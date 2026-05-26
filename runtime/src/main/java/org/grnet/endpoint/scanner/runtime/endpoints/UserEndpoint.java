@@ -20,7 +20,6 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
 @Path("/users")

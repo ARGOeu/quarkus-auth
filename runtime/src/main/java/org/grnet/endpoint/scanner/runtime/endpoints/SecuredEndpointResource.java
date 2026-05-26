@@ -23,8 +23,6 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.AuthorizationRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.EndpointResolverRequest;
 import org.grnet.endpoint.scanner.runtime.entities.EndpointResolver;
 import org.grnet.endpoint.scanner.runtime.entities.ResourceAuthorization;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
