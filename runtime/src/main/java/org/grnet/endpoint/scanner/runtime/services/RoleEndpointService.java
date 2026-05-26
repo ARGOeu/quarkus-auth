@@ -259,7 +259,7 @@ public class RoleEndpointService {
                                 a.getSecuredEndpointId()
                                         + ":" +
                                         (a.getScope() != null
-                                                ? a.getScope().name().toLowerCase()
+                                                ? a.getScope().name().toUpperCase()
                                                 : "")
                         )
                         .collect(Collectors.toSet());
