@@ -1,6 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.entitlements;
 
-import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
 
 import java.util.Collections;
 import java.util.List;

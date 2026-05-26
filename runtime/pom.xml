@@ -11,7 +11,17 @@
     <name>Quarkus Auth - Runtime</name>
     <packaging>jar</packaging>
 
+
+    <properties>
+        <lombok.version>1.18.30</lombok.version>
+    </properties>
     <dependencies>
+
+        <!-- Lombok for reducing boilerplate in DTO classes -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-core</artifactId>
@@ -97,6 +107,12 @@
                                 <path>
                                     <groupId>io.quarkus</groupId>
                                     <artifactId>quarkus-extension-processor</artifactId>
+                                </path>
+
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                    <version>${lombok.version}</version>
                                 </path>
                             </annotationProcessorPaths>
                             <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
