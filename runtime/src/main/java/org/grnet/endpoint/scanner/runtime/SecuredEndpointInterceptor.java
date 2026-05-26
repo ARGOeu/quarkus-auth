@@ -45,8 +45,6 @@ public class SecuredEndpointInterceptor {
     @Inject
     ApiResourceHolder apiResourceHolder;
 
-    @Inject
-    RoleEndpointContext roleEndpointContext;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
     private List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
@@ -74,8 +72,7 @@ public class SecuredEndpointInterceptor {
 
         ROLE_ENDPOINTS = roleEndpointRepository.list("secured_endpoint_id", securedEndpointId);
 
-        roleEndpointContext.setRoleEndpoints(ROLE_ENDPOINTS);
-
+        RoleEndpointHolder.set(ROLE_ENDPOINTS);
         RequestParams params = read(context, method);
 
         boolean hasAccess = checkEntitlement(
