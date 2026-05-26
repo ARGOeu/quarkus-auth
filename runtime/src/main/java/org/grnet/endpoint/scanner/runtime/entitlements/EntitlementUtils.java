@@ -2,6 +2,7 @@ package org.grnet.endpoint.scanner.runtime.entitlements;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 public class EntitlementUtils {
@@ -46,5 +47,33 @@ public class EntitlementUtils {
         }
 
         return list;
+    }
+
+    public static ResourceRoleEntitlement extractResourceRole(Entitlement entitlement) {
+
+        var hierarchy = entitlement.getHierarchy();
+
+        if (hierarchy.size() < 4) {
+            return null;
+        }
+
+        return new ResourceRoleEntitlement(
+                hierarchy.get(0), // namespace
+                hierarchy.get(1), // role
+                hierarchy.get(2), // resource name
+                hierarchy.get(3)  // resource id
+        );
+    }
+
+    public static List<ResourceRoleEntitlement> extractResourceRoles(List<Entitlement> entitlements) {
+
+        if (entitlements == null) {
+            return List.of();
+        }
+
+        return entitlements.stream()
+                .map(EntitlementUtils::extractResourceRole)
+                .filter(Objects::nonNull)
+                .toList();
     }
 }

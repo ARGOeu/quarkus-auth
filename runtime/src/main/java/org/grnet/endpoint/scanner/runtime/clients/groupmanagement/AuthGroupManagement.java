@@ -7,7 +7,7 @@ import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.Group
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupRequest;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUser;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
-import org.grnet.endpoint.scanner.runtime.endpoints.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
