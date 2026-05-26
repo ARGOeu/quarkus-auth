@@ -83,7 +83,7 @@ public class SecuredEndpointInterceptor {
                 secured,
                 params
         );
-
+        //
         if (!hasAccess) {
             throw new ForbiddenException("Access denied.");
         }
