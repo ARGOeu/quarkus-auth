@@ -3,8 +3,9 @@ package org.grnet.endpoint.scanner.runtime.services;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import org.grnet.endpoint.scanner.runtime.entities.EndpointResolver;
-import org.grnet.endpoint.scanner.runtime.repositories.EndpointResolverRepository;
+import org.grnet.endpoint.scanner.runtime.entities.EndpointResolverRepository;
 
 import java.util.List;
 

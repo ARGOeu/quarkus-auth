@@ -13,7 +13,13 @@ import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.oidc.TokenIntrospection;
 import jakarta.enterprise.context.ApplicationScoped;
-import org.grnet.endpoint.scanner.runtime.*;
+import org.grnet.endpoint.scanner.runtime.ApiResource;
+import org.grnet.endpoint.scanner.runtime.ApiResourceHolder;
+import org.grnet.endpoint.scanner.runtime.ApiResourceMetadata;
+import org.grnet.endpoint.scanner.runtime.EndpointMetadata;
+import org.grnet.endpoint.scanner.runtime.EndpointMetadataHolder;
+import org.grnet.endpoint.scanner.runtime.EndpointRecorder;
+import org.grnet.endpoint.scanner.runtime.Scope;
 import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsTokenProvider;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
@@ -22,41 +28,36 @@ import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakTokenC
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUserResponse;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.UserGroupInfoDto;
-import org.grnet.endpoint.scanner.runtime.context.RoleEndpointCleanupFilter;
 import org.grnet.endpoint.scanner.runtime.context.RoleEndpointContext;
-import org.grnet.endpoint.scanner.runtime.context.RoleEndpointHolder;
 import org.grnet.endpoint.scanner.runtime.endpoints.ApiResourceEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.AssignRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
+import org.grnet.endpoint.scanner.runtime.endpoints.AssignRoleRequest;
+import org.grnet.endpoint.scanner.runtime.endpoints.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.endpoints.InformativeResponse;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageLink;
 import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
 import org.grnet.endpoint.scanner.runtime.endpoints.RoleEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.endpoints.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.endpoints.UserEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.UserProfileDto;
-import org.grnet.endpoint.scanner.runtime.repositories.EndpointResolverRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.ResourceAuthorizationRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.RoleEndpointRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.jdbc.EndpointResolverJdbcRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.jdbc.PersistenceEntitlementJDBCRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.jdbc.ResourceAuthorizationJdbcRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.jdbc.RoleEndpointJdbcRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.EndpointResolverMongoRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.endpoints.UserProfileDto;
+import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.EndpointResolverJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.PersistenceEntitlementJDBCRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.ResourceAuthorizationJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.jdbc.RoleEndpointJdbcRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.EndpointResolverMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Actor;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.ActorEntitlements;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Setting;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.PersistenceEntitlementMongoRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.RoleEndpointMongoRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.ActorCodec;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.ActorEntitlementsCodec;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.EntitlementCodec;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.PersistenceEntitlementCodecProvider;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.ResourceAuthorizationCodec;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.codec.SettingCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.PersistenceEntitlementMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.RoleEndpointMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ActorEntitlementsCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.EntitlementCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.PersistenceEntitlementCodecProvider;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.ResourceAuthorizationCodec;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.codec.SettingCodec;
 import org.grnet.endpoint.scanner.runtime.entities.pagination.Page;
 import org.grnet.endpoint.scanner.runtime.entities.pagination.PageQuery;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProviderWithPersistence;
@@ -73,9 +74,9 @@ import org.grnet.endpoint.scanner.runtime.process.Event;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
 import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
+import org.grnet.endpoint.scanner.runtime.SecuredEndpointInterceptor;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
 import org.grnet.endpoint.scanner.runtime.endpoints.SecuredEndpointResource;
-import org.grnet.endpoint.scanner.runtime.services.RoleEndpointService;
 import org.grnet.endpoint.scanner.runtime.services.Utility;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
@@ -92,6 +93,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -191,13 +194,13 @@ class EndpointScannerProcessor {
 
             Set<Scope> scopes = new HashSet<>();
 
-            AnnotationValue scopeValue = annotation.value("scope");
-
-            if (scopeValue != null && scopeValue.asEnumArray() != null) {
-                for (var enumVal : scopeValue.asEnumArray()) {
-                    scopes.add(Scope.valueOf(enumVal));
-                }
+            var scopeValue = annotation.value("scope");
+            if (scopeValue != null) {
+                Arrays.stream(scopeValue.asEnumArray())
+                        .map(Scope::valueOf)
+                        .forEach(scopes::add);
             }
+
             addEndpoint(endpoints, new EndpointMetadata(generateSecuredEndpointId(httpMethod, fullPath), httpMethod, fullPath, description, scopes));
         }
 
@@ -289,7 +292,6 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleResponse.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.PageableRoleResponse.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Scope.class.getName()));
-        additionalBeans.produce(new AdditionalBeanBuildItem(RoleEndpointCleanupFilter.class));
     }
 
     @BuildStep
@@ -314,10 +316,7 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(ResourceAuthorizationRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(EndpointResolverRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointService.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class));
-
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class));
     }
 
     @BuildStep
@@ -420,7 +419,7 @@ class EndpointScannerProcessor {
                 .builder()
                 .addBeanClass(entitlementProviderImplementation)
                 .setUnremovable()
-                .build(), AdditionalBeanBuildItem
+                .build(),AdditionalBeanBuildItem
                 .builder()
                 .addBeanClass(roleEndpointImplementation)
                 .setUnremovable()
@@ -473,7 +472,6 @@ class EndpointScannerProcessor {
         // Wire it into the CDI bean
         return new SecuredEndpointMetadataBuildItem(metadata);
     }
-
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
     ApiResourcesBuildItem collectApiResources(
@@ -634,11 +632,11 @@ class EndpointScannerProcessor {
 
         syntheticBeanBuildItemBuildProducer.produce(
                 SyntheticBeanBuildItem.configure(AuthGroupManagement.class)
-                        .scope(ApplicationScoped.class)
-                        .unremovable()
-                        .setRuntimeInit()
-                        .runtimeValue(recorder.createAuthGroupManagement(filter))
-                        .done());
+                .scope(ApplicationScoped.class)
+                .unremovable()
+                .setRuntimeInit()
+                .runtimeValue(recorder.createAuthGroupManagement(filter))
+                .done());
     }
 
     @BuildStep
@@ -663,22 +661,5 @@ class EndpointScannerProcessor {
             result.add(item.getName());
         }
         return result;
-    }
-
-    private Set<Scope> extractScopes(AnnotationInstance annotation) {
-
-        Set<Scope> scopes = new HashSet<>();
-
-        AnnotationValue scopeValue = annotation.value("scope");
-
-        if (scopeValue == null || scopeValue.asEnumArray() == null) {
-            return scopes;
-        }
-
-        for (var enumVal : scopeValue.asEnumArray()) {
-            scopes.add(Scope.valueOf(enumVal));
-        }
-
-        return scopes;
     }
 }

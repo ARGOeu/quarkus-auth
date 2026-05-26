@@ -1,6 +1,6 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement;
 
-import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.endpoints.RoleResponse;
 
 import java.util.List;
 

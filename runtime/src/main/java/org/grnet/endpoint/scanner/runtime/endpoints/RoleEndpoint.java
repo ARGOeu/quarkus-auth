@@ -30,10 +30,6 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.ParamRef;
 import org.grnet.endpoint.scanner.runtime.ParamType;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.AssignRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.RevokeRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
 import java.util.List;

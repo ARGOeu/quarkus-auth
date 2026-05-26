@@ -15,8 +15,8 @@ import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsToken
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
-import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.mongo.ResourceAuthorizationMongoRepository;
+import org.grnet.endpoint.scanner.runtime.entities.PersistenceEntitlementRepository;
+import org.grnet.endpoint.scanner.runtime.entities.mongo.ResourceAuthorizationMongoRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.OIDCEntitlementService;
 import org.grnet.endpoint.scanner.runtime.entitlements.PersistenceEntitlementService;
 import org.grnet.endpoint.scanner.runtime.entitlements.UserContextInterface;
