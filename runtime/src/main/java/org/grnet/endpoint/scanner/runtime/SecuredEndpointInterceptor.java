@@ -11,9 +11,9 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
-import org.grnet.endpoint.scanner.runtime.context.RoleEndpointContext;
+import org.grnet.endpoint.scanner.runtime.context.RoleEndpointHolder;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
-import org.grnet.endpoint.scanner.runtime.entities.RoleEndpointRepository;
+import org.grnet.endpoint.scanner.runtime.repositories.RoleEndpointRepository;
 import org.grnet.endpoint.scanner.runtime.entitlements.Entitlement;
 import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementProvider;
 import org.jboss.logging.Logger;
@@ -46,7 +46,7 @@ public class SecuredEndpointInterceptor {
     ApiResourceHolder apiResourceHolder;
 
     @Inject
-    RoleEndpointContext roleEndpointContext;
+    RoleEndpointHolder roleHolder;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
     private List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
@@ -74,8 +74,9 @@ public class SecuredEndpointInterceptor {
 
         ROLE_ENDPOINTS = roleEndpointRepository.list("secured_endpoint_id", securedEndpointId);
 
-        roleEndpointContext.setRoleEndpoints(ROLE_ENDPOINTS);
-
+        // roleEndpointContext.setRoleEndpoints(ROLE_ENDPOINTS);
+        //context.getContextData().put("ROLE_ENDPOINTS", ROLE_ENDPOINTS);
+        RoleEndpointHolder.set(ROLE_ENDPOINTS);
         RequestParams params = read(context, method);
 
         boolean hasAccess = checkEntitlement(
@@ -83,7 +84,7 @@ public class SecuredEndpointInterceptor {
                 secured,
                 params
         );
-        //
+
         if (!hasAccess) {
             throw new ForbiddenException("Access denied.");
         }
@@ -136,7 +137,7 @@ public class SecuredEndpointInterceptor {
                             .map(String::toUpperCase)
                             .anyMatch(access ->
                                     normalizedEntitlements.contains(
-                                            roleName + ":" + access
+                                            (roleName + ":" + access).toUpperCase()
                                     )
                             );
                 });
@@ -314,7 +315,8 @@ public class SecuredEndpointInterceptor {
                 Map<String, Object> extracted =
                         objectMapper.convertValue(
                                 item,
-                                new TypeReference<Map<String, Object>>() {}
+                                new TypeReference<Map<String, Object>>() {
+                                }
                         );
 
                 result.putAll(extracted);
@@ -325,7 +327,8 @@ public class SecuredEndpointInterceptor {
 
         return objectMapper.convertValue(
                 body,
-                new TypeReference<Map<String, Object>>() {}
+                new TypeReference<Map<String, Object>>() {
+                }
         );
     }
 
