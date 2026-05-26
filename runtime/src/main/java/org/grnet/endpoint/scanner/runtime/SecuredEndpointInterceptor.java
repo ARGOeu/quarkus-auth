@@ -45,9 +45,6 @@ public class SecuredEndpointInterceptor {
     @Inject
     ApiResourceHolder apiResourceHolder;
 
-    @Inject
-    RoleEndpointHolder roleHolder;
-
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
     private List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
 
