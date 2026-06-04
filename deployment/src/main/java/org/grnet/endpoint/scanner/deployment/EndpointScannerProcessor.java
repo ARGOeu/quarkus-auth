@@ -316,8 +316,7 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointService.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class),
-                AdditionalBeanBuildItem.unremovableOf(TestRoleEndpointRepository.class));
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class));
 
 
     }
