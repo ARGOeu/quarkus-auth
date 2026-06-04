@@ -319,6 +319,7 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class),
                 AdditionalBeanBuildItem.unremovableOf(TestRoleEndpointRepository.class));
 
+
     }
 
     @BuildStep
