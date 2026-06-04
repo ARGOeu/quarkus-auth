@@ -39,7 +39,6 @@ import org.grnet.endpoint.scanner.runtime.repositories.EndpointResolverRepositor
 import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.ResourceAuthorizationRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.RoleEndpointRepository;
-import org.grnet.endpoint.scanner.runtime.repositories.TestRoleEndpointRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.jdbc.EndpointResolverJdbcRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.jdbc.PersistenceEntitlementJDBCRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.jdbc.ResourceAuthorizationJdbcRepository;
