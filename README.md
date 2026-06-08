@@ -41,21 +41,87 @@ The application interacting with the public client must request the entitlements
 
 ### 2.3 Required Configuration Parameters
 
-The library must be configured to understand which entitlement namespace and parent-group hierarchy apply to the API.
+> ⚠️ All properties listed in this section must be added to the **consuming API's** `application.properties`.
 
-The following parameters must be set:
+#### 2.3.1 Entitlements Configuration
 
-```
-api.auth.entitlements.parent-group=parent-group-name
+These settings define the entitlement namespace, the root parent group hierarchy, and the role that grants super admin privileges.
+
+```properties
 api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
+api.auth.entitlements.parent-group=parent-group-name
 api.auth.entitlements.super-admin-role=super_admin
 ```
 
-These settings define:
+| Parameter | Description |
+|-----------|-------------|
+| `api.auth.entitlements.namespace` | The entitlement namespace that the library should match against incoming tokens. |
+| `api.auth.entitlements.parent-group` | The root parent group, which may include multiple hierarchical subgroups. |
+| `api.auth.entitlements.super-admin-role` | The role name assigned to the parent group that grants super admin privileges. Any user belonging to a group with this role is treated as a super admin and is given full administrative access. |
 
-- The entitlement namespace that the library should match.
-- The root parent group, which may include multiple hierarchical subgroups.
-- Defines the role name assigned to the parent group that grants super admin privileges for the API. Any user belonging to a group with this role is treated as a super admin and is given full administrative access.
+---
+
+#### 2.3.2 OIDC Token Configuration
+
+This setting defines which claim in the OIDC token is used as the unique identifier for the authenticated user.
+
+```properties
+api.auth.oidc.user.unique.id=voperson_id
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `api.auth.oidc.user.unique.id` | The OIDC token claim used to uniquely identify the authenticated user (e.g. `sub`, `voperson_id`). |
+
+---
+
+#### 2.3.3 Keycloak Group Management Integration
+
+These settings configure the connection to the Group Management Client (RCIAM), which is required for resolving/adding group memberships and entitlements at runtime.
+
+```properties
+api.auth.entitlements.keycloak-group-management-client-url=https://keycloak.example.org/group-management
+api.auth.entitlements.keycloak-group-management-client-id=my-client-id
+api.auth.entitlements.keycloak-group-management-client-secret=my-client-secret
+```
+
+| Parameter | Description                                                                                                                                                                     |
+|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `api.auth.entitlements.keycloak-group-management-client-url` | The base URL of the Group Management Client API (RCIAM).                                                                                                                        |
+| `api.auth.entitlements.keycloak-group-management-client-id` | The client ID used to authenticate against the group management service.                                                                                                        |
+| `api.auth.entitlements.keycloak-group-management-client-secret` | The client secret used to authenticate against the group management service. Should be kept confidential and preferably injected via environment variable or a secrets manager. |
+
+#### 2.3.4 OIDC Provider Configuration
+
+> In addition to the properties below, the following Quarkus dependency must be present in the API's `pom.xml`:
+>
+> ```xml
+> <dependency>
+>     <groupId>io.quarkus</groupId>
+>     <artifactId>quarkus-oidc</artifactId>
+> </dependency>
+> ```
+
+
+These settings configure the connection to your OpenID Connect (OIDC) Identity Provider. The library uses the Client Credentials Flow for authentication. You may use any OIDC-compliant provider — Keycloak is used internally.
+
+```properties
+quarkus.oidc.client-id=backend-service
+quarkus.oidc.credentials.secret=secret
+quarkus.oidc.auth-server-url=https://login-devel.einfra.grnet.gr/auth/realms/einfra
+quarkus.oidc.token-path=/protocol/openid-connect/token
+quarkus.oidc.authorization-path=/protocol/openid-connect/auth
+quarkus.oidc.introspection-path=/protocol/openid-connect/token/introspect
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `quarkus.oidc.client-id` | The client ID registered with your Identity Provider. |
+| `quarkus.oidc.credentials.secret` | The client secret used to authenticate with your Identity Provider. |
+| `quarkus.oidc.auth-server-url` | The base URL of the OIDC server (realm URL for Keycloak). |
+| `quarkus.oidc.token-path` | Relative path or absolute URL of the token endpoint. |
+| `quarkus.oidc.authorization-path` | Relative path or absolute URL of the OIDC authorization endpoint. |
+| `quarkus.oidc.introspection-path` | Relative path or absolute URL of the RFC 7662 token introspection endpoint. |
 
 ### 2.4 Consistent Entitlement Structure
 
@@ -126,36 +192,7 @@ Within the client’s settings, the administrator can review or regenerate the c
 Once these settings follow the recommended instructions, the confidential client can be used by backend services to validate tokens through introspection.
 
 
-### 3.4 Using Client Secret Authentication with Our API
-
-Our API uses OpenID Connect (OIDC) authentication based on the Client Credentials Flow as described above. To access protected endpoints, you must authenticate using:
-
-- Client ID
-- Client Secret
-- The base URL of the OpenID Connect (OIDC) server
-- Token Endpoint of your Identity Provider (IdP)
-- The relative path or absolute URL of the OpenID Connect (OIDC) authorization endpoint
-- Relative path or absolute URL of the OIDC RFC7662 introspection endpoint
-
-We use Keycloak internally, but you may use any OIDC-compliant provider.
-
-#### 3.4.1 Required `application.properties` Configuration
-
-These properties **must** be added to make authentication work.
-
----
-
-```properties
-quarkus.oidc.client-id=backend-service
-quarkus.oidc.credentials.secret=secret
-quarkus.oidc.auth-server-url=https://login-devel.einfra.grnet.gr/auth/realms/einfra
-quarkus.oidc.token-path=/protocol/openid-connect/token
-quarkus.oidc.authorization-path=/protocol/openid-connect/auth
-quarkus.oidc.introspection-path=/protocol/openid-connect/token/introspect
-```
----
-
-### 3.5 Using the Public Client to Obtain an Access Token
+### 3.4 Using the Public Client to Obtain an Access Token
 
 Applications that cannot securely store secrets, such as browser-based applications, must use the public client to obtain an access token from Keycloak.
 The public client is intended for environments where the application runs on the end user’s device and cannot protect confidential credentials.
@@ -196,17 +233,6 @@ Each entitlement follows a predefined hierarchical structure of the form:
 - `parent-group`: Defines the organizational scope or group hierarchy in which the entitlement is applicable.
 
 - `role-name`: The specific role assigned to the user within the namespace and group context.
-
-To allow the library to correctly filter and evaluate only the entitlements that belong to the authorization model of this API, the following configuration parameters must be set:
-
----
-```properties
-api.auth.entitlements.parent-group=parent-group-name
-api.auth.entitlements.namespace=urn:mace:grnet.gr:einfra:login-devel
-api.auth.entitlements.super-admin-role=super_admin
-```
----
-These parameters instruct the authorization library to inspect only the entitlements that match the configured namespace and the parent group hierarchy.
 
 
 ### 4.4 Assigning Entitlements to a User
@@ -317,7 +343,6 @@ This endpoint returns a JSON list of all potential secured endpoints:
 The user must:
 
 1. Be in the specified **group**
-2. Have the specified **role** inside that group
 
 ---
 
@@ -334,11 +359,11 @@ public class AdminEndpoint {
 
 ## 7. Install the JAR locally
 
-You must download the latest build of the **quarkus-auth** library.
+You have three options to obtain the **quarkus-auth** library.
 
 ---
 
-### **Option A — Download from GitHub Actions**
+### Option A — Download from GitHub Actions (manual)
 Open the Actions page:
 
 🔗 **https://github.com/ARGOeu/quarkus-auth/actions**
@@ -349,41 +374,94 @@ Open the Actions page:
 4. Extract it and locate the file: `quarkus-auth-1.0.0-SNAPSHOT.jar`
 ---
 
-### **Option B — Download via GitHub CLI**
+Then install it into your local Maven repository:
 
 ```bash
-gh run download \
-$(gh run list --repo ARGOeu/quarkus-auth --branch devel --limit 1 --json databaseId -q ".[0].databaseId") \
---repo ARGOeu/quarkus-auth \
---dir .
+mvn install:install-file \
+  -Dfile= \
+  -DgroupId=org.grnet \
+  -DartifactId=quarkus-auth \
+  -Dversion=1.0.0-SNAPSHOT \
+  -Dpackaging=jar \
+  -DgeneratePom=true
 ```
----
 
-
-### After downloading the JAR
-
-Install it into your local Maven repository:
-
-
-```bash
-mvn install:install-file    
--Dfile=<path-to-file>    
--DgroupId=org.grnet    
--DartifactId=quarkus-auth    
--Dversion=1.0.0-SNAPSHOT    
--Dpackaging=jar    
--DgeneratePom=true
-```
-This will place the library under your local Maven directory:
+This will place the library under:
 ```
 ~/.m2/repository/org/grnet/quarkus-auth/1.0.0-SNAPSHOT/
 ```
 
 ---
 
+### Option B — Download via GitHub CLI
+
+```bash
+gh run download \
+  $(gh run list --repo ARGOeu/quarkus-auth --branch devel --limit 1 --json databaseId -q ".[0].databaseId") \
+  --repo ARGOeu/quarkus-auth \
+  --dir .
+```
+
+Then install the JAR the same way as Option A.
+
+---
+
+
+### Option C — GitHub Packages (recommended)
+
+The library is published to GitHub Packages and can be pulled automatically by Maven, without manually downloading or installing any JAR.
+
+#### 1. Generate a GitHub Personal Access Token
+
+You need a GitHub token with the **`read:packages`** scope.
+
+Go to: **GitHub → Settings → Developer settings → Personal access tokens**
+
+#### 2. Configure your Maven `settings.xml`
+
+Add the following server entry to `~/.m2/settings.xml`:
+
+```xml
+
+<servers>
+    <server>
+      <id>github</id>
+      <username>xxxxxxxx</username>
+      <password>xxxxxxxxxxx</password>
+    </server>
+</servers>
+
+```
+
+> ⚠️ Use your Personal Access Token (not your GitHub password) as the `<password>` value.
+
+#### 3. Add the repository to your `pom.xml`
+
+```xml
+
+<repositories>
+    <repository>
+        <id>github</id>
+        <url>https://maven.pkg.github.com/ARGOeu/quarkus-auth</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </repository>
+</repositories>
+
+```
+
+Once configured, Maven will resolve the dependency automatically — no manual JAR installation needed.
+
+---
+
+
 ## 8. Add the dependency to your project
 
-In your **api** module's `pom.xml`:
+In your **api** module's `pom.xml`, regardless of the installation method chosen:
 
 ```xml
 <dependency>
@@ -393,11 +471,12 @@ In your **api** module's `pom.xml`:
 </dependency>
 ```
 ---
+
 ## 9. Summary
 
 To use `quarkus-auth`, you must:
 
-1. Install the `.jar` using `mvn install:install-file`
+1. Obtain the library via one of the three options above
 2. Add the dependency to `pom.xml`
 3. Include all required properties in `application.properties`
 4. Use `@SecuredEndpoint` where access control is needed
