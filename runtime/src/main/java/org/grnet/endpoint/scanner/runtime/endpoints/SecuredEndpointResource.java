@@ -54,10 +54,11 @@ public class SecuredEndpointResource {
     @Inject
     ResourceAuthorizationService resourceAuthorizationService;
 
-    @Tag(name = "Secured Endpoints")
+    @Tag(name = "Quarkus Auth")
     @Operation(
-            summary = "List all secured endpoints",
-            description = "Returns a list of secured endpoints."
+            summary = "List secured endpoints.",
+            description = "Retrieves all registered secured endpoints, " +
+                    "including their HTTP method, path, description, and required scopes."
     )
     @APIResponse(
             responseCode = "200",

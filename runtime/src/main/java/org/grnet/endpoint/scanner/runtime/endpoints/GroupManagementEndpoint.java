@@ -2,13 +2,10 @@ package org.grnet.endpoint.scanner.runtime.endpoints;
 
 import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
@@ -26,36 +23,36 @@ import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import org.grnet.endpoint.scanner.runtime.*;
-import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
-
-import java.util.List;
+import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
 
 import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
 
-@Path("/api-resources")
+@Path("/members")
 @Authenticated
-@SecurityScheme(securitySchemeName = "Authentication",
+@SecurityScheme(
+        securitySchemeName = "Authentication",
         description = "JWT token",
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "JWT",
         in = SecuritySchemeIn.HEADER)
-public class ApiResourceEndpoint {
+public class GroupManagementEndpoint {
+
     @Inject
-    ResourceAuthorizationService resourceAuthorizationService;
+    AuthGroupManagement authGroupManagement;
 
     @Tag(name = "Quarkus Auth")
     @Operation(
-            summary = "List all API resources.",
-            description = "Retrieves all API resources available in the application."
+            summary = "List application members.",
+            description = "Retrieves a paginated list of application members along with their assigned memberships and roles."
     )
     @APIResponse(
             responseCode = "200",
-            description = "List of all api resources.",
+            description = "List of application members.",
             content = @Content(schema = @Schema(
                     type = SchemaType.OBJECT,
-                    implementation = PageableApiResources.class)))
+                    implementation = Object.class)))
     @APIResponse(
             responseCode = "401",
             description = "User has not been authenticated.",
@@ -77,7 +74,7 @@ public class ApiResourceEndpoint {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @SecuredEndpoint
-    public Response getSecuredEndpoints(
+    public Response getAllMembers(
             @Parameter(name = "page", in = QUERY, description = "Indicates the page number. Page number must be >= 1.")
             @DefaultValue("1")
             @Min(value = 1, message = "Page number must be >= 1.")
@@ -88,27 +85,17 @@ public class ApiResourceEndpoint {
             @Min(value = 1, message = "Page size must be between 1 and 100.")
             @Max(value = 100, message = "Page size must be between 1 and 100.")
             @QueryParam("size")
-            int size, @Context UriInfo uriInfo) {
+            int size,
+            @Parameter(name = "search", in = QUERY, description = "Search members by username, name or email.")
+            @QueryParam("search")
+            String search,
+            @Parameter(name = "resource", in = QUERY, description = "Filter members by resource type, e.g. Tenant, Project, Invitation.")
+            @QueryParam("resource")
+            String resource,
+            @Context UriInfo uriInfo) {
 
-        var resources = resourceAuthorizationService.getApiResourcesByPage(page - 1, size, uriInfo);
+        var members = authGroupManagement.getAllMembersByPageAndSize(page - 1, size, search, resource, uriInfo);
 
-        return Response.ok().entity(resources).build();
-    }
-
-    public static class PageableApiResources extends PageResource<ApiResourceMetadata> {
-
-        private List<ApiResourceMetadata> content;
-
-        @Override
-        public List<ApiResourceMetadata> getContent() {
-            return content;
-        }
-
-        @Override
-        public void setContent(List<ApiResourceMetadata> content) {
-            this.content = content;
-        }
+        return Response.ok().entity(members).build();
     }
 }
-
-

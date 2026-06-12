@@ -1,6 +1,7 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response;
 
 import java.util.List;
+import java.util.Map;
 
 public class GroupUserResponse {
 
@@ -14,5 +15,5 @@ public class GroupUserResponse {
 
     public String uid;
 
-    public List<UserGroupInfoDto> tenants;
+    public Map<String, List<UserGroupInfoDto>> memberships;
 }

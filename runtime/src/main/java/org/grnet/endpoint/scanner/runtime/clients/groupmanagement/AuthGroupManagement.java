@@ -1,13 +1,14 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement;
 
 import io.quarkus.rest.client.reactive.QuarkusRestClientBuilder;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.AddGroupMemberRequest;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.Group;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupMembersResponse;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupRequest;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUser;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
+import jakarta.ws.rs.core.UriInfo;
+import org.apache.commons.lang3.StringUtils;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.*;
 import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
+import org.grnet.endpoint.scanner.runtime.entities.pagination.Page;
+import org.grnet.endpoint.scanner.runtime.entities.pagination.PageQueryImpl;
+import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementUtils;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
@@ -17,6 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static io.vertx.core.http.impl.HttpUtils.normalizePath;
+import static java.lang.Math.min;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Implementation of {@link RoleManagement} that models group management structures as roles
@@ -302,6 +308,65 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         getGroupClient().addUserToGroup(id, new AddGroupMemberRequest(username, List.of(role)));
     }
 
+    public PageResource<GroupUserResponse> getAllMembersByPageAndSize(int page, int size, String search, String resource, UriInfo uriInfo) {
+
+        var all = getApplicationMembers(
+                "/" + parentGroup + "/members",
+                search
+        );
+
+        if (StringUtils.isNotBlank(resource)) {
+            all = all.stream()
+                    .filter(user -> user.memberships != null
+                            && user.memberships.containsKey(resource))
+                    .map(user -> {
+                        user.memberships = Map.of(resource, user.memberships.get(resource));
+                        return user;
+                    })
+                    .toList();
+        }
+
+        var pages = partition(all, size);
+        var content = pages.getOrDefault(page, List.of());
+
+        var result = new PageQueryImpl<GroupUserResponse>();
+        result.list = content;
+        result.index = page;
+        result.count = all.size();
+        result.size = size;
+        result.page = Page.of(page, size);
+
+        return new PageResource<>(result, result.list, uriInfo);
+    }
+
+    public List<GroupUserResponse> getApplicationMembers(String groupName, String search) {
+
+        int first = 0;
+        int size = 100;
+
+        List<GroupUserResponse> users = new ArrayList<>();
+
+        while (true) {
+            var response = fetchGroupMembers(groupName, first, size, search);
+
+            if (response == null || response.results == null || response.results.isEmpty()) {
+                break;
+            }
+
+            response.results.stream()
+                    .map(member -> mapAllMember(member.user))
+                    .forEach(users::add);
+
+            first += size;
+
+            if (users.size() >= response.count) {
+                break;
+            }
+        }
+
+        return users;
+    }
+
     private void updateGroupConfigurationRoles(String groupId, List<String> roles) {
 
         // Fetch full group structure
@@ -384,6 +449,47 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
                 collectGroupRecursive(child, map);
             }
         }
+    }
+
+    private GroupUserResponse mapAllMember(GroupUser gu) {
+
+        var user = new GroupUserResponse();
+        user.id = gu.id;
+        user.email = gu.email;
+        user.username = gu.username;
+        user.firstName = gu.firstName;
+        user.lastName = gu.lastName;
+        user.uid = gu.getUid();
+        user.memberships = new HashMap<>();
+
+        if (gu.attributes == null || gu.attributes.getLocalEntitlements() == null) {
+            return user;
+        }
+
+        var parsedEntitlements = EntitlementUtils.parseEntitlements(
+                gu.attributes.getLocalEntitlements()
+        );
+
+        EntitlementUtils.extractResourceRoles(parsedEntitlements)
+                .forEach(entitlement -> {
+                    var dto = new UserGroupInfoDto();
+                    dto.name = entitlement.resourceId();
+                    dto.role = entitlement.role();
+
+                    user.memberships
+                            .computeIfAbsent(entitlement.resource(), key -> new ArrayList<>())
+                            .add(dto);
+                });
+
+        return user;
+    }
+
+    private <T> Map<Integer, List<T>> partition(List<T> list, int pageSize) {
+        return IntStream.iterate(0, i -> i + pageSize)
+                .limit((list.size() + pageSize - 1) / pageSize)
+                .boxed()
+                .collect(toMap(i -> i / pageSize,
+                        i -> list.subList(i, min(i + pageSize, list.size()))));
     }
 }
 

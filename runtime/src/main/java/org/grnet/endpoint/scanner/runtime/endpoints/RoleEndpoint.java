@@ -52,10 +52,10 @@ public class RoleEndpoint {
     @Inject
     ResourceAuthorizationService resourceAuthorizationService;
 
-    @Tag(name = "Roles")
+    @Tag(name = "Quarkus Auth")
     @Operation(
             summary = "Create a new role.",
-            description = "Create a new role."
+            description = "Creates a new role and associates it with the specified resource."
     )
     @APIResponse(
             responseCode = "200",

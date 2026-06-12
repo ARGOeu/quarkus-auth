@@ -36,10 +36,11 @@ public class UserEndpoint {
     @Inject
     ResourceAuthorizationService resourceAuthorizationService;
 
-    @Tag(name = "User")
+    @Tag(name = "Quarkus Auth")
     @Operation(
-            summary = "Get User Profile.",
-            description = "This endpoint retrieves the user profile information.")
+            summary = "Get user profile.",
+            description = "Retrieves the profile information of the currently authenticated user."
+    )
     @APIResponse(
             responseCode = "200",
             description = "User's Profile.",
