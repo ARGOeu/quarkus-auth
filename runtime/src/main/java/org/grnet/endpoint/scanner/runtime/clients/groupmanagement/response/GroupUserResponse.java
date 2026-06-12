@@ -14,5 +14,5 @@ public class GroupUserResponse {
 
     public String uid;
 
-    public List<UserGroupInfoDto> tenants;
+    public List<UserGroupInfoDto> groups;
 }
