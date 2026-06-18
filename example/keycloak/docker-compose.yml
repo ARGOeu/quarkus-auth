@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres2
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres2"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  keycloak:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: test1_keycloak
+    container_name: local-keycloak
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: tempadmin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: tempadmin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/postgres2
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    command:
+      - start-dev
+      - --http-port=8080
+      - --import-realm
+    ports:
+      - "58080:8080"
+    volumes:
+      - ./realms:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/58080; echo -e 'GET /realms/master/.well-known/openid-configuration HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; cat <&3 | grep -q '200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+
+  run-entitlements:
+    image: test1_keycloak
+    container_name: local-run-entitlements
+    depends_on:
+      - keycloak
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/postgres2
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    volumes:
+      - ./init.sh:/tmp/init.sh
+
+    # Override entrypoint to run our script
+    entrypoint: ["sh", "/tmp/init.sh"]
+
+    restart: "no"
+
+volumes:
+  postgres_data:

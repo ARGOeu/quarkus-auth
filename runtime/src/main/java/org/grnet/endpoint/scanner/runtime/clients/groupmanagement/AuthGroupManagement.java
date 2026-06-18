@@ -72,6 +72,43 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         return groupClient;
     }
 
+    public void createParentGroup(){
+
+        LOG.info("Executing required steps for initializing necessary group management structure...");
+
+        var parentId = getGroupIdByPath("/"+parentGroup);
+        if (parentId == null) {
+
+            LOG.info("Step 1 : Initialing parent level "+parentGroup+"...");
+
+            var req = new GroupRequest();
+            req.name = parentGroup;
+            req.attributes = Map.of();
+
+            getGroupClient().createParentGroup(req);
+
+            LOG.info("Parent level "+parentGroup+" has been successfully initialized!");
+        } else {
+
+            LOG.info("Step 1 : Parent level "+parentGroup+" has already been initialized!");
+        }
+
+        var membershipGroupId = getGroupIdByPath("/"+parentGroup+"/members");
+
+        if (membershipGroupId == null) {
+
+            LOG.info("Step 2 : Initialing memberships ...");
+
+            createGroup("/"+parentGroup, "members", null, null);
+
+            LOG.info("Memberships have been successfully initialized!");
+        } else {
+
+            LOG.info("Step 2 : Memberships have already been initialized!");
+        }
+
+        LOG.info("Group management initialization has been successfully completed!");
+    }
 
     // ---------------------------------------------------------
     // CREATE GROUP
@@ -86,7 +123,6 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         var req = new GroupRequest();
         req.name = name;
         req.attributes = attributes;
-
 
         // Resolve parent group ID
         var parentId = getGroupIdByPath(parentPath);
@@ -175,7 +211,9 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     }
 
     @Override
-    public GroupMembersResponse fetchGroupMembers(String fullPath, int first, int max, String search) {
+    public GroupMembersResponse fetchGroupMembers(String path, int first, int max, String search) {
+
+        var fullPath = "/" + parentGroup + "/members";
 
         var groupId = getGroupIdByPath(fullPath);
 
