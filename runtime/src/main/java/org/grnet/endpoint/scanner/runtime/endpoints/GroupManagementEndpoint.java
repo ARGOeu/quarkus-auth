@@ -25,6 +25,7 @@ import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
+import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
 import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
 
@@ -40,7 +41,7 @@ import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUE
 public class GroupManagementEndpoint {
 
     @Inject
-    AuthGroupManagement authGroupManagement;
+    ResourceAuthorizationService resourceAuthorizationService;
 
     @Tag(name = "Quarkus Auth")
     @Operation(
@@ -94,7 +95,7 @@ public class GroupManagementEndpoint {
             String resource,
             @Context UriInfo uriInfo) {
 
-        var members = authGroupManagement.getAllMembersByPageAndSize(page - 1, size, search, resource, uriInfo);
+        var members = resourceAuthorizationService.getAllMembersByPageAndSize(page - 1, size, search, resource, uriInfo);
 
         return Response.ok().entity(members).build();
     }

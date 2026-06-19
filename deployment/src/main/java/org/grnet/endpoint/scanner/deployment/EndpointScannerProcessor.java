@@ -15,10 +15,7 @@ import io.quarkus.oidc.TokenIntrospection;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.grnet.endpoint.scanner.runtime.*;
 import org.grnet.endpoint.scanner.runtime.clients.KeycloakClientCredentialsTokenProvider;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.AuthGroupManagement;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.BearerTokenRequestFilter;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakGroupManagementClient;
-import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.KeycloakTokenClient;
+import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.*;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupUserResponse;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.PartialGroup;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.UserGroupInfoDto;
@@ -32,6 +29,7 @@ import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.dtos.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.endpoints.RoleEndpoint;
 import org.grnet.endpoint.scanner.runtime.internal.AuthGroupInitializer;
+import org.grnet.endpoint.scanner.runtime.internal.AgmGroupCache;
 import org.grnet.endpoint.scanner.runtime.repositories.EndpointResolverRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.ResourceAuthorizationRepository;
@@ -68,11 +66,8 @@ import org.grnet.endpoint.scanner.runtime.process.AfterProcessing;
 import org.grnet.endpoint.scanner.runtime.process.BeforeProcessing;
 import org.grnet.endpoint.scanner.runtime.process.Event;
 import org.grnet.endpoint.scanner.runtime.resolvers.GroupIdResolver;
-import org.grnet.endpoint.scanner.runtime.services.EndpointResolverService;
-import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
+import org.grnet.endpoint.scanner.runtime.services.*;
 import org.grnet.endpoint.scanner.runtime.database.SchemaInitializer;
-import org.grnet.endpoint.scanner.runtime.services.RoleEndpointService;
-import org.grnet.endpoint.scanner.runtime.services.Utility;
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
 import org.jboss.jandex.AnnotationValue;
@@ -288,6 +283,8 @@ class EndpointScannerProcessor {
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(RoleEndpoint.PageableRoleResponse.class.getName()));
         additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(Scope.class.getName()));
         additionalBeans.produce(new AdditionalBeanBuildItem(RoleEndpointCleanupFilter.class));
+        additionalIndexedClasses.produce(new AdditionalIndexedClassesBuildItem(AgmGroupCache.class.getName()));
+        additionalBeans.produce(AdditionalBeanBuildItem.unremovableOf(AgmGroupCache.class));
     }
 
     @BuildStep
@@ -315,8 +312,8 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointService.class),
                 AdditionalBeanBuildItem.unremovableOf(AuthGroupInitializer.class),
-                AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class));
-
+                AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class),
+                AdditionalBeanBuildItem.unremovableOf(AgmGroupCache.class));
 
     }
 

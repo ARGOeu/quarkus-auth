@@ -1,14 +1,9 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement;
 
 import io.quarkus.rest.client.reactive.QuarkusRestClientBuilder;
-import jakarta.ws.rs.core.UriInfo;
-import org.apache.commons.lang3.StringUtils;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.*;
+import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
-import org.grnet.endpoint.scanner.runtime.endpoints.PageResource;
-import org.grnet.endpoint.scanner.runtime.entities.pagination.Page;
-import org.grnet.endpoint.scanner.runtime.entities.pagination.PageQueryImpl;
-import org.grnet.endpoint.scanner.runtime.entitlements.EntitlementUtils;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
@@ -72,6 +67,11 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         return groupClient;
     }
 
+
+    // ---------------------------------------------------------
+    // CREATE GROUP
+    // ---------------------------------------------------------
+
     public void createParentGroup(){
 
         LOG.info("Executing required steps for initializing necessary group management structure...");
@@ -110,9 +110,6 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         LOG.info("Group management initialization has been successfully completed!");
     }
 
-    // ---------------------------------------------------------
-    // CREATE GROUP
-    // ---------------------------------------------------------
     @Override
     public void createGroup(String parentPath, String name, List<String> roles, Map<String, List<String>> attributes) {
 
@@ -176,13 +173,13 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
      * group management structure. Once created, the role can be assigned to users
      * either as a global role or configured as a resource role with associated resources.
      *
-     * @param roleName the unique name of the role to be created
+     * @param request the unique name of the role to be created
      */
     @Override
-    public void createNewRole(String roleName){
+    public void createNewRole(CreateRoleRequest request){
 
         var parentPath = "/" + parentGroup;
-        createGroup(parentPath, roleName, List.of(), null);
+        createGroup(parentPath, request.name, List.of(), request.attributes);
     }
 
     /**
@@ -235,7 +232,7 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
         var group = getGroupClient().getGroup(groupId);
 
-        return group.extraSubGroups.stream().map(gr -> new RoleResponse(gr.id, gr.name)).collect(Collectors.toList());
+        return group.extraSubGroups.stream().map(gr -> new RoleResponse(gr.id, gr.name, gr.attributes)).collect(Collectors.toList());
     }
 
     // ---------------------------------------------------------
@@ -311,11 +308,21 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     }
 
     @Override
-    public void assignResourceRoleToUser(String username, String role, String resource, String id){
+    public void assignResourceRoleToUser(String username, String role, String resource, String id, Map<String, List<String>> attributes){
 
         var specificResourcePath = "/" + parentGroup + "/" + role + "/"+ resource+"/"+id;
 
         var specificResourceGroupId = getGroupIdByPath(specificResourcePath);
+
+        if (specificResourceGroupId != null && attributes != null && !attributes.isEmpty()) {
+
+            var group = getGroupClient().getGroup(specificResourceGroupId);
+
+            if (needsAttributeUpdate(group.attributes, attributes)) {
+                var merged = mergeAttributes(group.attributes, attributes);
+                updateGroupAttributes(specificResourceGroupId, merged);
+            }
+        }
 
         if (Objects.isNull(specificResourceGroupId)){
 
@@ -325,10 +332,10 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
             if(Objects.isNull(resourceGroupId)){
 
-                createGroup("/" + parentGroup + "/" + role, resource, List.of(), null);
+                createGroup("/" + parentGroup + "/" + role, resource, List.of(), attributes);
             }
 
-            createGroup("/" + parentGroup + "/" + role + "/"+ resource, id, List.of(), null);
+            createGroup("/" + parentGroup + "/" + role + "/"+ resource, id, List.of(), attributes);
         }
 
         addGroupMember(specificResourcePath, username, "member");
@@ -344,65 +351,6 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         }
 
         getGroupClient().addUserToGroup(id, new AddGroupMemberRequest(username, List.of(role)));
-    }
-
-    public PageResource<GroupUserResponse> getAllMembersByPageAndSize(int page, int size, String search, String resource, UriInfo uriInfo) {
-
-        var all = getApplicationMembers(
-                "/" + parentGroup + "/members",
-                search
-        );
-
-        if (StringUtils.isNotBlank(resource)) {
-            all = all.stream()
-                    .filter(user -> user.memberships != null
-                            && user.memberships.containsKey(resource))
-                    .map(user -> {
-                        user.memberships = Map.of(resource, user.memberships.get(resource));
-                        return user;
-                    })
-                    .toList();
-        }
-
-        var pages = partition(all, size);
-        var content = pages.getOrDefault(page, List.of());
-
-        var result = new PageQueryImpl<GroupUserResponse>();
-        result.list = content;
-        result.index = page;
-        result.count = all.size();
-        result.size = size;
-        result.page = Page.of(page, size);
-
-        return new PageResource<>(result, result.list, uriInfo);
-    }
-
-    public List<GroupUserResponse> getApplicationMembers(String groupName, String search) {
-
-        int first = 0;
-        int size = 100;
-
-        List<GroupUserResponse> users = new ArrayList<>();
-
-        while (true) {
-            var response = fetchGroupMembers(groupName, first, size, search);
-
-            if (response == null || response.results == null || response.results.isEmpty()) {
-                break;
-            }
-
-            response.results.stream()
-                    .map(member -> mapAllMember(member.user))
-                    .forEach(users::add);
-
-            first += size;
-
-            if (users.size() >= response.count) {
-                break;
-            }
-        }
-
-        return users;
     }
 
     private void updateGroupConfigurationRoles(String groupId, List<String> roles) {
@@ -437,17 +385,21 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
 
     // Internal lookup: resolves a group ID from the flattened groups map
     private String getGroupIdByPath(String fullPath) {
-        return flattenGroups().get(fullPath);
+        var group = flattenGroups().get(fullPath);
+        return group == null ? null : group.id;
     }
 
     // Builds a map of all groups (path → id, id → defaultConfigId) by flattening the Keycloak tree
-    private Map<String, String> flattenGroups() {
+    public Map<String, Group> flattenGroups() {
+
         var response = getGroupClient().getGroups("");
-        Map<String, String> map = new HashMap<>();
+
+        Map<String, Group> map = new HashMap<>();
 
         for (Group group : response.results) {
             collectGroupRecursive(group, map);
         }
+
         return map;
     }
 
@@ -473,14 +425,8 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
     }
 
     // Recursively adds a group's path, id, and default configuration to the lookup map
-    private void collectGroupRecursive(Group group, Map<String, String> map) {
-        // Path → ID
-        map.put(group.path, group.id);
-
-        // ID → defaultConfiguration
-        if (group.attributes != null && group.attributes.containsKey("defaultConfiguration")) {
-            map.put(group.id, group.attributes.get("defaultConfiguration").get(0));
-        }
+    private void collectGroupRecursive(Group group, Map<String, Group> map) {
+        map.put(group.path, group);
 
         if (group.extraSubGroups != null) {
             for (Group child : group.extraSubGroups) {
@@ -489,37 +435,65 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         }
     }
 
-    private GroupUserResponse mapAllMember(GroupUser gu) {
 
-        var user = new GroupUserResponse();
-        user.id = gu.id;
-        user.email = gu.email;
-        user.username = gu.username;
-        user.firstName = gu.firstName;
-        user.lastName = gu.lastName;
-        user.uid = gu.getUid();
-        user.memberships = new HashMap<>();
+    public void updateRoleAttributes(String groupId, Map<String, List<String>> attributes) {
 
-        if (gu.attributes == null || gu.attributes.getLocalEntitlements() == null) {
-            return user;
+        var group = getGroupClient().getGroup(groupId);
+
+        if (needsAttributeUpdate(group.attributes, attributes)) {
+
+            var merged = mergeAttributes(group.attributes, attributes);
+            updateGroupAttributes(groupId, merged);
+        }
+    }
+
+    private void updateGroupAttributes(String groupId, Map<String, List<String>> attributes) {
+
+        if (attributes == null || attributes.isEmpty()) { return; }
+
+        getGroupClient().updateGroupAttributes(groupId, attributes);
+    }
+
+    private boolean needsAttributeUpdate(
+            Map<String, List<String>> existing,
+            Map<String, List<String>> incoming) {
+
+        if (incoming == null || incoming.isEmpty()) { return false; }
+
+        if (existing == null || existing.isEmpty()) { return true; }
+
+        return incoming.entrySet()
+                .stream()
+                .anyMatch(entry -> !entry.getValue().equals(existing.get(entry.getKey())));
+    }
+
+    private Map<String, List<String>> mergeAttributes(
+            Map<String, List<String>> existing,
+            Map<String, List<String>> incoming) {
+
+        var merged = new HashMap<String, List<String>>();
+
+        if (existing != null) {
+            merged.putAll(existing);
         }
 
-        var parsedEntitlements = EntitlementUtils.parseEntitlements(
-                gu.attributes.getLocalEntitlements()
-        );
+        if (incoming != null) {
+            merged.putAll(incoming);
+        }
 
-        EntitlementUtils.extractResourceRoles(parsedEntitlements)
-                .forEach(entitlement -> {
-                    var dto = new UserGroupInfoDto();
-                    dto.name = entitlement.resourceId();
-                    dto.role = entitlement.role();
+        return merged;
+    }
 
-                    user.memberships
-                            .computeIfAbsent(entitlement.resource(), key -> new ArrayList<>())
-                            .add(dto);
-                });
+    public String getParentGroupPath() {
+        return normalizePath(parentGroup);
+    }
 
-        return user;
+    public String getMembersGroupPath() {
+        return getParentGroupPath() + "/members";
+    }
+
+    public GroupMembersResponse fetchGroupMembersByGroupId(String groupId, int first, int max, String search) {
+        return getGroupClient().getGroupMembers(groupId, first, max, search);
     }
 
     private <T> Map<Integer, List<T>> partition(List<T> list, int pageSize) {

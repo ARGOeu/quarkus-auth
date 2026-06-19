@@ -6,6 +6,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.UserGroupInfoDto;
 
 import java.util.List;
+import java.util.Map;
 
 @Schema(description = "Request to fetch reports from a target API")
 public class UserProfileDto {
@@ -50,8 +51,10 @@ public class UserProfileDto {
     public String surname;
 
     @Schema(
-            description = "User entitlements (group memberships and roles)"
+            type = SchemaType.OBJECT,
+            implementation = Map.class,
+            description = "User memberships grouped by resource type."
     )
-    @JsonProperty("groups")
-    public List<UserGroupInfoDto> groups;
+    @JsonProperty("memberships")
+    public Map<String, List<UserGroupInfoDto>> memberships;
 }
