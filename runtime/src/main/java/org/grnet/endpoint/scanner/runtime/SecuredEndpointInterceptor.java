@@ -125,6 +125,10 @@ public class SecuredEndpointInterceptor {
 
                     String roleName =
                             entry.getRoleName().toUpperCase();
+                    if (normalizedEntitlements.contains(roleName)) {
+                        return true;
+                    }
+
                     // No params/access rules → role-only check
                     if (acceptedAccess.isEmpty()) {
                         return normalizedEntitlements.stream()
