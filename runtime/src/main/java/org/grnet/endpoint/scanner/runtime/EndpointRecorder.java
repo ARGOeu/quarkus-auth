@@ -151,7 +151,9 @@ public class EndpointRecorder {
         var parentGroup = config.getValue(
                 "api.auth.entitlements.parent-group", String.class);
 
-        return new RuntimeValue<>(new AuthGroupManagement(url, filter.getValue(), parentGroup));
+        var service = new AuthGroupManagement(url, filter.getValue(), parentGroup);
+
+        return new RuntimeValue<>(service);
     }
 
     public RuntimeValue<KeycloakClientCredentialsTokenProvider> createAuthTokenClient() {

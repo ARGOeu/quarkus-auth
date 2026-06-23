@@ -31,6 +31,7 @@ import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.dtos.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.endpoints.RoleEndpoint;
+import org.grnet.endpoint.scanner.runtime.internal.AuthGroupInitializer;
 import org.grnet.endpoint.scanner.runtime.repositories.EndpointResolverRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.PersistenceEntitlementRepository;
 import org.grnet.endpoint.scanner.runtime.repositories.ResourceAuthorizationRepository;
@@ -313,6 +314,7 @@ class EndpointScannerProcessor {
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointRepository.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointContext.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointService.class),
+                AdditionalBeanBuildItem.unremovableOf(AuthGroupInitializer.class),
                 AdditionalBeanBuildItem.unremovableOf(RoleEndpointHolder.class));
 
 
@@ -630,12 +632,14 @@ class EndpointScannerProcessor {
                         .runtimeValue(filter)
                         .done());
 
+        var service = recorder.createAuthGroupManagement(filter);
+
         syntheticBeanBuildItemBuildProducer.produce(
                 SyntheticBeanBuildItem.configure(AuthGroupManagement.class)
                         .scope(ApplicationScoped.class)
                         .unremovable()
                         .setRuntimeInit()
-                        .runtimeValue(recorder.createAuthGroupManagement(filter))
+                        .runtimeValue(service)
                         .done());
     }
 

@@ -27,6 +27,13 @@ public interface KeycloakGroupManagementClient {
     GroupResponse getGroups(@QueryParam("search") String search);
 
     // -------------------------------------------------------------
+    // Create Parent Group
+    // -------------------------------------------------------------
+    @POST
+    @Path("/group-admin/group")
+    void createParentGroup(GroupRequest request);
+
+    // -------------------------------------------------------------
     // Create subgroup
     // -------------------------------------------------------------
     @POST

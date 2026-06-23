@@ -19,7 +19,6 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
 import org.grnet.endpoint.scanner.runtime.dtos.UserProfileDto;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
@@ -76,7 +75,6 @@ public class UserEndpoint {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @Path("/profile")
-    @SecuredEndpoint()
     public Response profile() {
 
         var response = resourceAuthorizationService.getUserProfile();
@@ -123,7 +121,6 @@ public class UserEndpoint {
     @POST
     @Path("/registration")
     @Produces(MediaType.APPLICATION_JSON)
-    @SecuredEndpoint()
     public Response registerMember() {
 
         resourceAuthorizationService.assignUserTheMemberRole();
