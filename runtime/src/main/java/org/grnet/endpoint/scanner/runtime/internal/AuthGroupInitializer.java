@@ -13,6 +13,6 @@ public class AuthGroupInitializer {
     AuthGroupManagement authGroupManagement;
 
     void onStart(@Observes StartupEvent event) {
-        authGroupManagement.createParentGroup();
+        //authGroupManagement.createParentGroup();
     }
 }
