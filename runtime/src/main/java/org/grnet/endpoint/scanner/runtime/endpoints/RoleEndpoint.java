@@ -19,16 +19,16 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.security.SecurityRequirement;
 import org.eclipse.microprofile.openapi.annotations.security.SecurityScheme;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.grnet.endpoint.scanner.runtime.ParamRef;
 import org.grnet.endpoint.scanner.runtime.ParamType;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
-import org.grnet.endpoint.scanner.runtime.dtos.AssignRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.RevokeRoleRequest;
-import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
+import org.grnet.endpoint.scanner.runtime.dtos.*;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
+import org.grnet.endpoint.scanner.runtime.services.RoleEndpointService;
+import org.grnet.endpoint.scanner.runtime.validators.constraints.ValidRole;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +46,8 @@ import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUE
 public class RoleEndpoint {
     @Inject
     ResourceAuthorizationService resourceAuthorizationService;
+    @Inject
+    RoleEndpointService roleEndpointService;
 
     @Tag(name = "Quarkus Auth")
     @Operation(
@@ -304,6 +306,183 @@ public class RoleEndpoint {
             this.content = content;
         }
     }
+
+    @Tag(name = "Quarkus Auth")
+    @Operation(summary = "Assign secured endpoint to a specific role",
+            description = "Assign secured endpoint to a specific role")
+    @APIResponse(
+            responseCode = "200",
+            description = "Secured endpoints assigned successfully",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Tenant already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "501",
+            description = "Not Implemented.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @SecurityRequirement(name = "Authentication")
+    @POST
+    @Path("/{id}/assign-endpoints")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+
+    public Response bulkAssignPerRole(@Parameter(
+                                              description = "The ID of the role.",
+                                              required = true,
+                                              example = "c242e43f-9869-4fb0-b881-631bc5746ec0",
+                                              schema = @Schema(type = SchemaType.STRING)) @PathParam("id")
+                                      @Valid @ValidRole String id,
+                                      SecuredEndpointPerRoleRequest request) throws io.undertow.util.BadRequestException {
+
+        roleEndpointService.assignRolesToEndpointsPerRole(id,request);
+        var informativeResponse = new InformativeResponse();
+        informativeResponse.code = 200;
+        informativeResponse.message = "SecuredEndpoints assigned successfully";
+
+        return Response.ok().entity(informativeResponse).build();
+    }
+
+
+    @Tag(name = "Quarkus Auth")
+    @Operation(summary = "Retrieve assigned secured endpoints to roles",
+            description = "Retrieve assigned secured endpoints to roles")
+    @APIResponse(
+            responseCode = "200",
+            description = "Assigned secured endpoints retrieved successfully",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "SecuredEndpoint already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "501",
+            description = "Not Implemented.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @SecurityRequirement(name = "Authentication")
+
+    @GET
+    @Path("/assigned-endpoints")
+    @Produces(MediaType.APPLICATION_JSON)
+
+    public Response getAssignedEndpointsPerRole() {
+
+        RoleEndpointAssignmentResponse response =
+                roleEndpointService.getAssignedEndpoints();
+
+        return Response.ok(response).build();
+    }
+
+
+
+    @Tag(name = "Quarkus Auth")
+    @Operation(summary = "Retrieve assigned secured endpoint to roles",
+            description = "Retrieve assigned secured endpoint to roles")
+    @APIResponse(
+            responseCode = "200",
+            description = "Assigned secured endpoints retrieved successfully",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "409",
+            description = "Secured Endpoint already exists.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "501",
+            description = "Not Implemented.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @SecurityRequirement(name = "Authentication")
+
+    @GET
+    @Path("/{id}/assigned-endpoints")
+    @Produces(MediaType.APPLICATION_JSON)
+
+    public Response getAssignedEndpointsPerRoleId(@Parameter(
+            description = "The ID of the role.",
+            required = true,
+            example = "c242e43f-9869-4fb0-b881-631bc5746ec0",
+            schema = @Schema(type = SchemaType.STRING)) @PathParam("id")
+                                                  @Valid @ValidRole String id) {
+
+        RoleEndpointAssignmentResponse response =
+                roleEndpointService.getAssignedEndpointsByRoleId(id);
+
+        return Response.ok(response).build();
+    }
+
 }
 
 
