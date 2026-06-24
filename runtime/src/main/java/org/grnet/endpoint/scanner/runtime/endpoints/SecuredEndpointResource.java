@@ -41,6 +41,7 @@ import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUE
 
 @Path("/secured-endpoints")
 @Authenticated
+@Tag(name = "Quarkus Auth")
 @SecurityScheme(securitySchemeName = "Authentication",
         description = "JWT token",
         type = SecuritySchemeType.HTTP,
@@ -54,7 +55,6 @@ public class SecuredEndpointResource {
     @Inject
     ResourceAuthorizationService resourceAuthorizationService;
 
-    @Tag(name = "Quarkus Auth")
     @Operation(
             summary = "List secured endpoints.",
             description = "Retrieves all registered secured endpoints, " +
@@ -105,7 +105,6 @@ public class SecuredEndpointResource {
         return Response.ok().entity(securedEndpoints).build();
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Create/Update authorization rule for a secured endpoint.",
             description = "Create authorization rule."
@@ -236,7 +235,6 @@ public class SecuredEndpointResource {
 //        return Response.ok().build();
 //    }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Create mapping between entity fields for endpoint  in order to resolve.",
             description = "Create mapping between entity fields for endpoint in order to resolve."
@@ -294,7 +292,6 @@ public class SecuredEndpointResource {
         return endpointResolverService.findAllEndpointResolverByEndpoint(id);
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Get authorization resource rules for a secured enpoint",
             description = "CGet authorization resource rules"
@@ -338,7 +335,6 @@ public class SecuredEndpointResource {
         return resourceAuthorizationService.findByEndpointSecuredEndpointId(id);
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Get a specific resource authorization  rule by id",
             description = "Get resource authorization rule"
@@ -382,7 +378,6 @@ public class SecuredEndpointResource {
         return resourceAuthorizationService.findById(id);
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Get resolved fields for a secured endpoint",
             description = "Get resolved fields for a secured endpoint"
@@ -427,7 +422,6 @@ public class SecuredEndpointResource {
         return endpointResolverService.findAllEndpointResolver();
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Update resolved field for or a secured endpoint",
             description = "Update resolved field for or a secured endpoint"
@@ -486,7 +480,6 @@ public class SecuredEndpointResource {
         return existing;
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Delete resolved fields for secured endpoint",
             description = "Delete resolved field"
@@ -536,7 +529,6 @@ public class SecuredEndpointResource {
         return Response.ok(Map.of("message", "Successfully deleted")).build();
     }
 
-    @Tag(name = "Secured Endpoints")
     @Operation(
             summary = "Get a specific resolved field  by id",
             description = "Get a specific resolved field"

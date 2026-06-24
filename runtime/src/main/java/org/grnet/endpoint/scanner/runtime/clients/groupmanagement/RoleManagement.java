@@ -1,8 +1,10 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement;
 
+import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a role management system that models group management structures as roles.
@@ -32,7 +34,7 @@ public interface RoleManagement {
      * @param resource the type or category of the resource (e.g., "Tenant", "Project")
      * @param id       the unique identifier of the specific resource instance
      */
-    void assignResourceRoleToUser(String username, String role, String resource, String id);
+    void assignResourceRoleToUser(String username, String role, String resource, String id, Map<String, List<String>> attributes);
 
     /**
      * Assigns a global role to a user.
@@ -56,7 +58,7 @@ public interface RoleManagement {
      *
      * @param roleName the unique name of the role to be created
      */
-    void createNewRole(String roleName);
+    void createNewRole(CreateRoleRequest roleName);
 
     /**
      * Assigns the default "members" role to the specified user. This serves as the entry-point role assignment for new users,

@@ -16,6 +16,9 @@ import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.Group
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupRequest;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.GroupResponse;
 
+import java.util.List;
+import java.util.Map;
+
 @Path("/agm/account")
 public interface KeycloakGroupManagementClient {
 
@@ -101,4 +104,15 @@ public interface KeycloakGroupManagementClient {
     @Path("/group-admin/group/{groupId}/member/user/{memberId}")
     void removeMemberFromGroup(@PathParam("groupId") String groupId,
                                @PathParam("memberId") String memberId);
+
+    // -------------------------------------------------------------
+    // Update group attributes
+    // -------------------------------------------------------------
+    @POST
+    @Path("/group-admin/group/{groupId}/attributes")
+    @Consumes(MediaType.APPLICATION_JSON)
+    void updateGroupAttributes(
+            @PathParam("groupId") String groupId,
+            Map<String, List<String>> attributes
+    );
 }

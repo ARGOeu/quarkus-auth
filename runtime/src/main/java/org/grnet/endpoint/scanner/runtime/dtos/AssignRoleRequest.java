@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
+import java.util.List;
 import java.util.Map;
 
 @Schema(name="AssignRoleRequest", description="A request to assign role to a specific user.")
@@ -52,4 +53,12 @@ public class AssignRoleRequest {
             description = "Extra request parameters."
     )
     public Map<String, Object> extras;
+
+    @Schema(
+            type = SchemaType.OBJECT,
+            implementation = Map.class,
+            description = "Optional role attributes.",
+            example = "{\"preferred_name\":[\"Administrator\"],\"description\":[\"Administrative role\"]}"
+    )
+    public Map<String, List<String>> attributes;
 }

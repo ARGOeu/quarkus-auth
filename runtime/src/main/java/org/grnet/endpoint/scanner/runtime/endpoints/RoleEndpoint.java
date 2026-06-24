@@ -6,13 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.DefaultValue;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -37,6 +31,7 @@ import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.eclipse.microprofile.openapi.annotations.enums.ParameterIn.QUERY;
 
@@ -95,7 +90,61 @@ public class RoleEndpoint {
         return Response.ok().entity(response).build();
     }
 
-    @Tag(name = "Roles")
+    @Tag(name = "Quarkus Auth")
+    @Operation(
+            summary = "Update role attributes.",
+            description = "Updates the attributes of an existing role."
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Role attributes updated successfully.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "404",
+            description = "Role not found.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @PUT
+    @Path("/{id}/attributes")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+    public Response updateRoleAttributes(
+            @PathParam("id") String id,
+            @NotNull(message = "The request body is empty.")
+            Map<String, List<String>> attributes) {
+
+        resourceAuthorizationService.updateRoleAttributes(id, attributes);
+
+        var response = new InformativeResponse();
+        response.code = 200;
+        response.message = "Role attributes updated successfully.";
+
+        return Response.ok().entity(response).build();
+    }
+
+    @Tag(name = "Quarkus Auth")
     @Operation(
             summary = "List all roles.",
             description = "Returns a list of roles."
@@ -145,7 +194,7 @@ public class RoleEndpoint {
         return Response.ok().entity(resources).build();
     }
 
-    @Tag(name = "Roles")
+    @Tag(name = "Quarkus Auth")
     @Operation(
             summary = "Assign a new role to user.",
             description = "Assign a new role to user."
@@ -193,7 +242,7 @@ public class RoleEndpoint {
         return Response.ok().entity(resources).build();
     }
 
-    @Tag(name = "Roles")
+    @Tag(name = "Quarkus Auth")
     @Operation(
             summary = "Revoke a role from a member.",
             description = "Revoke a role from a member."

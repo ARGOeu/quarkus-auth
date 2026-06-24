@@ -82,7 +82,6 @@ public class UserEndpoint {
         return Response.ok(response).build();
     }
 
-    @Tag(name = "User")
     @Operation(
             summary = "Register as member",
             description = "Registers the authenticated user as a platform member. This is a self-registration operation."
