@@ -371,7 +371,7 @@ Open the Actions page:
 1. Select the latest workflow run on **branch `devel`**
 2. Scroll down to **Artifacts**
 3. Download the archive (e.g. `quarkus-auth.zip`)
-4. Extract it and locate the file: `quarkus-auth-1.0.0-SNAPSHOT.jar`
+4. Extract it and locate the file: `quarkus-auth-x.x.x.jar`
 ---
 
 Then install it into your local Maven repository:
@@ -381,14 +381,14 @@ mvn install:install-file \
   -Dfile= \
   -DgroupId=org.grnet \
   -DartifactId=quarkus-auth \
-  -Dversion=1.0.0-SNAPSHOT \
+  -Dversion=x.x.x \
   -Dpackaging=jar \
   -DgeneratePom=true
 ```
 
 This will place the library under:
 ```
-~/.m2/repository/org/grnet/quarkus-auth/1.0.0-SNAPSHOT/
+~/.m2/repository/org/grnet/quarkus-auth/x.x.x/
 ```
 
 ---
@@ -467,7 +467,7 @@ In your **api** module's `pom.xml`, regardless of the installation method chosen
 <dependency>
     <groupId>org.grnet</groupId>
     <artifactId>quarkus-auth</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>x.x.x</version>
 </dependency>
 ```
 ---
