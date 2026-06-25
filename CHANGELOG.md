@@ -24,6 +24,13 @@ According to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) , the `Unr
 ## Unreleased
 ---
 
+## 1.0.1 - 2025-06-25
+
+## Fixed
+
+Fix version for deploying quarkus-auth in github packages
+
+
 ## 1.0.0 - 2025-06-25
 
 This initial release delivers the foundation of the Quarkus Auth Extension, providing a complete solution for securing APIs through RCIAM authentication, Group Management authorization, user administration, role management, and dynamic endpoint protection.
