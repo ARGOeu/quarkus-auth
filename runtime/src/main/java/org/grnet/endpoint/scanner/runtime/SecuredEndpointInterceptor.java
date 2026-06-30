@@ -146,39 +146,61 @@ public class SecuredEndpointInterceptor {
                             );
                 });
     }
-
     private List<String> extractAcceptedAccess(
             SecuredEndpoint secured,
             RequestParams params
     ) {
 
-        Map<ParamType, Map<String, Object>> sources = Map.of(
-                ParamType.PATH, params.path,
-                ParamType.BODY, extractBody(params.body),
-                ParamType.QUERY, params.query,
-                ParamType.HEADER, params.header
-        );
-
         Map<ParamType, Map<String, ParamRef>> refMaps =
                 Arrays.stream(secured.params())
                         .collect(Collectors.groupingBy(
                                 ParamRef::type,
-                                Collectors.toMap(ParamRef::param, Function.identity())
+                                Collectors.toMap(
+                                        ParamRef::param,
+                                        Function.identity()
+                                )
                         ));
 
         List<String> acceptedAccess = new ArrayList<>();
 
-        for (var type : sources.keySet()) {
+        // PATH params
+        if (refMaps.containsKey(ParamType.PATH)) {
             processParams(
-                    sources.get(type),
-                    refMaps.getOrDefault(type, Map.of()),
+                    params.path,
+                    refMaps.get(ParamType.PATH),
+                    acceptedAccess
+            );
+        }
+
+        // QUERY params
+        if (refMaps.containsKey(ParamType.QUERY)) {
+            processParams(
+                    params.query,
+                    refMaps.get(ParamType.QUERY),
+                    acceptedAccess
+            );
+        }
+
+        // HEADER params
+        if (refMaps.containsKey(ParamType.HEADER)) {
+            processParams(
+                    params.header,
+                    refMaps.get(ParamType.HEADER),
+                    acceptedAccess
+            );
+        }
+
+        // BODY params (only extract if actually needed)
+        if (refMaps.containsKey(ParamType.BODY)) {
+            processParams(
+                    extractBody(params.body),
+                    refMaps.get(ParamType.BODY),
                     acceptedAccess
             );
         }
 
         return acceptedAccess;
     }
-
     private void processParams(
             Map<String, Object> values,
             Map<String, ParamRef> refMap,
@@ -292,48 +314,34 @@ public class SecuredEndpointInterceptor {
     }
 
     private Map<String, Object> extractBody(Object body) {
+        Map<String, Object> result = new HashMap<>();
+        extract(body, result);
+        return result;
+    }
 
-        if (body == null) {
-            return Map.of();
+    @SuppressWarnings("unchecked")
+    private void extract(Object value, Map<String, Object> result) {
+
+        if (value == null) {
+            return;
         }
 
-        if (body instanceof Map<?, ?> map) {
-            return (Map<String, Object>) map;
+        if (value instanceof Map<?, ?> map) {
+            result.putAll((Map<String, Object>) map);
+            return;
         }
 
-        if (body instanceof Iterable<?> iterable) {
-
-            Map<String, Object> result = new HashMap<>();
-
+        if (value instanceof Iterable<?> iterable) {
             for (Object item : iterable) {
-
-                if (item == null) {
-                    continue;
-                }
-
-                // skip framework objects
-                if (item instanceof UriInfo) {
-                    continue;
-                }
-
-                Map<String, Object> extracted =
-                        objectMapper.convertValue(
-                                item,
-                                new TypeReference<Map<String, Object>>() {
-                                }
-                        );
-
-                result.putAll(extracted);
+                extract(item, result);
             }
-
-            return result;
+            return;
         }
 
-        return objectMapper.convertValue(
-                body,
-                new TypeReference<Map<String, Object>>() {
-                }
-        );
+        result.putAll(objectMapper.convertValue(
+                value,
+                new TypeReference<Map<String, Object>>() {}
+        ));
     }
 
     private boolean isSimpleType(Class<?> clazz) {
