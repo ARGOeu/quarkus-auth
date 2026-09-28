@@ -11,6 +11,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.UriInfo;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.grnet.endpoint.scanner.runtime.context.RoleEndpointHolder;
 import org.grnet.endpoint.scanner.runtime.entities.RoleEndpoint;
 import org.grnet.endpoint.scanner.runtime.repositories.RoleEndpointRepository;
@@ -47,6 +48,9 @@ public class SecuredEndpointInterceptor {
 
     @Inject
     RoleEndpointHolder roleHolder;
+
+    @ConfigProperty(name = "api.auth.entitlements.parent-group")
+    String parentGroup;
 
     private static final Logger LOG = Logger.getLogger(SecuredEndpointInterceptor.class);
     private List<RoleEndpoint> ROLE_ENDPOINTS = new ArrayList<>();
@@ -95,11 +99,11 @@ public class SecuredEndpointInterceptor {
     private List<String> extractEntitlements() {
         return entitlementProvider.fetchEntitlements().stream()
                 .map(e -> {
-                    String raw = e.getRaw();
-                    String prefix = "status-pages:";
-                    int idx = raw.indexOf(prefix);
+                    var raw = e.getRaw();
+                    var prefix = parentGroup + ":";
+                    var idx = raw.indexOf(prefix);
 
-                    String value = (idx != -1)
+                    var value = (idx != -1)
                             ? raw.substring(idx + prefix.length())
                             : raw;
 
