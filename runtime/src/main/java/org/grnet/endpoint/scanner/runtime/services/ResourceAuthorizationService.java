@@ -338,7 +338,7 @@ public class ResourceAuthorizationService {
             if (response == null || response.results == null || response.results.isEmpty()) {
                 break;
             }
-            
+
             response.results.stream()
                     .map(member -> mapAllMember(member.user, groups))
                     .forEach(users::add);
@@ -388,29 +388,53 @@ public class ResourceAuthorizationService {
         var memberships = new HashMap<String, List<UserGroupInfoDto>>();
         var parentGroup = authGroupManagement.getParentGroupPath();
 
-        EntitlementUtils.extractResourceRoles(entitlements)
+        var appEntitlements = entitlements.stream()
+                .filter(entitlement -> entitlement.getHierarchy() != null
+                        && !entitlement.getHierarchy().isEmpty()
+                        && ("/" + entitlement.getHierarchy().get(0)).equals(parentGroup))
+                .toList();
+
+        // Application-level roles
+        appEntitlements.stream()
+                .filter(entitlement -> entitlement.getHierarchy().size() <= 2)
                 .forEach(entitlement -> {
+
+                    var hierarchy = entitlement.getHierarchy();
+                    var groupPath = "/" + String.join("/", hierarchy);
+                    var group = groups.get(groupPath);
+
+                    if (group == null) return;
+
+                    var dto = new UserGroupInfoDto();
+                    dto.name = hierarchy.size() == 1
+                            ? entitlement.getRole()
+                            : entitlement.getGroup();
+                    dto.role = entitlement.getRole();
+                    dto.attributes = group.attributes;
+
+                    memberships
+                            .computeIfAbsent(dto.name, key -> new ArrayList<>())
+                            .add(dto);
+                });
+
+        // Resource roles
+        EntitlementUtils.extractResourceRoles(appEntitlements)
+                .forEach(entitlement -> {
+                    var resource = entitlement.resource();
+                    var groupPath = parentGroup + "/" + entitlement.role()
+                            + "/" + resource + "/" + entitlement.resourceId();
+
+                    var group = groups.get(groupPath);
+                    if (group == null) return;
+
                     var dto = new UserGroupInfoDto();
                     dto.name = entitlement.resourceId();
                     dto.role = entitlement.role();
+                    dto.attributes = group.attributes;
 
-                    var groupPath = parentGroup + "/"
-                            + entitlement.role() + "/"
-                            + entitlement.resource() + "/"
-                            + entitlement.resourceId();
-
-                    var group = groups.get(groupPath);
-
-                    if (group != null) {
-                        dto.attributes = group.attributes;
-                    }
-
-                    memberships
-                            .computeIfAbsent(entitlement.resource(), key -> new ArrayList<>())
-                            .add(dto);
+                    memberships.computeIfAbsent(resource, k -> new ArrayList<>()).add(dto);
                 });
 
         return memberships;
     }
-
 }
