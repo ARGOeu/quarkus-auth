@@ -223,7 +223,7 @@ public class RoleEndpointService {
 
         List<RoleEndpoint> existing = roleEndpointRepository.list("role_id", roleId);
 
-        // key = endpointId:scope
+      //   key = endpointId:scope
         Map<String, RoleEndpoint> existingMap =
                 existing.stream()
                         .collect(Collectors.toMap(
@@ -235,7 +235,6 @@ public class RoleEndpointService {
                                 e -> e,
                                 (a, b) -> a
                         ));
-
         // incoming unique keys
         Set<String> incomingKeys =
                 request.getAssignments().stream()
