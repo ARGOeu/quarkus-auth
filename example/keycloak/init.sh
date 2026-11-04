@@ -1,33 +1,57 @@
 #!/bin/sh
 
 REALM_LIST="rciam"
+SUPER_ADMIN_ROLE="${API_AUTH_ENTITLEMENTS_SUPER_ADMIN_ROLE:-super_admin}"
 
-echo "Waiting 30 seconds..."
-sleep 30
-# Added 10 more seconds, if not started properly, does not get access token
+set -eu
 
-echo "Short buffer for DB flush..."
-sleep 70
+MAX_ATTEMPTS=60
+SLEEP_SECONDS=3
 
-echo "Getting Admin Token..."
-TOKEN_RESPONSE=$(curl -s -X POST "http://keycloak:8080/realms/master/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=tempadmin" \
-  -d "password=tempadmin" \
-  -d "grant_type=password" \
-  -d "client_id=admin-cli")
+echo "Waiting for Keycloak admin token endpoint to be ready..."
 
-if [ $? -ne 0 ]; then
-  echo "ERROR: Failed to get token"
-  exit 1
-fi
+until curl -s -o /dev/null -w "%{http_code}" http://keycloak:8080/ | grep -qE "200|404|301|302"; do
+    echo "Waiting for Keycloak..."
+    sleep 5
+done
 
-# Extract token
-ACCTOK=$(echo "$TOKEN_RESPONSE" | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
+echo "Keycloak is up (responding HTTP)"
+
+attempt=1
+ACCTOK=""
+
+while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+    TOKEN_RESPONSE=$(curl -s -X POST "http://keycloak:8080/realms/master/protocol/openid-connect/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "username=tempadmin" \
+            -d "password=tempadmin" \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli")
+
+        if [ $? -ne 0 ]; then
+            echo "curl request failed, attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${SLEEP_SECONDS}s..."
+            attempt=$((attempt + 1))
+            sleep "$SLEEP_SECONDS"
+            continue
+        fi
+
+        ACCTOK=$(echo "$TOKEN_RESPONSE" | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
+
+        if [ -n "$ACCTOK" ] && [ "$ACCTOK" != "$TOKEN_RESPONSE" ]; then
+            echo "Keycloak is ready, got admin token (attempt ${attempt}/${MAX_ATTEMPTS})."
+            break
+        fi
+
+        echo "Not ready yet, attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${SLEEP_SECONDS}s..."
+        echo "DEBUG: response was: ${TOKEN_RESPONSE}"
+        ACCTOK=""
+        attempt=$((attempt + 1))
+        sleep "$SLEEP_SECONDS"
+done
 
 if [ -z "$ACCTOK" ]; then
-  echo "ERROR: Could not extract access token"
-  exit 1
+    echo "ERROR: Keycloak admin token could not be obtained after ${MAX_ATTEMPTS} attempts." >&2
+    exit 1
 fi
 
 echo "Token obtained successfully."
@@ -66,8 +90,7 @@ for REALM_NAME in $REALM_LIST; do
     echo "✗ [${REALM_NAME}] Failed"
   fi
 
-  # Small delay between requests
-  sleep 1
+sleep 1
 
 echo "Getting Group Management Admin Token..."
 TOKEN_AGM_RESPONSE=$(curl -s -X POST "http://keycloak:8080/realms/rciam/protocol/openid-connect/token" \
@@ -133,6 +156,20 @@ ID=$(echo "$body" | awk -F'"' '
 ')
 
 response=$(curl -s -w "\n%{http_code}" -X POST \
+  "http://keycloak:8080/realms/${REALM_NAME}/agm/account/group-admin/group/${ID}/roles?name=${SUPER_ADMIN_ROLE}" \
+  -H "Authorization: Bearer $ACCTOK" \
+  -H "Accept: application/json")
+
+status=$(echo "$response" | tail -n1)
+
+if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+  echo "❌ Failed to add role '${SUPER_ADMIN_ROLE}' to status-pages group. HTTP $status"
+  exit 1
+fi
+
+echo "✅ Success: role '${SUPER_ADMIN_ROLE}' added to status-pages group"
+
+response=$(curl -s -w "\n%{http_code}" -X POST \
   "http://keycloak:8080/realms/${REALM_NAME}/agm/account/group-admin/group/${ID}/children" \
   -H "Authorization: Bearer $ACCTOK" \
   -H "Content-Type: application/json" \
@@ -170,14 +207,14 @@ response=$(curl -s -w "\n%{http_code}" -X POST \
   -H "Authorization: Bearer $ACCTOK" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
-  -d '{
-    "user": {
-      "username": "admin"
+  -d "{
+    \"user\": {
+      \"username\": \"admin\"
     },
-    "groupRoles": [
-      "member"
+    \"groupRoles\": [
+      \"$SUPER_ADMIN_ROLE\"
     ]
-  }')
+  }")
 
 status=$(echo "$response" | tail -n1)
 
