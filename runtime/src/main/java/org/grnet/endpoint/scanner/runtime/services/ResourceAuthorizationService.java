@@ -3,6 +3,7 @@ package org.grnet.endpoint.scanner.runtime.services;
 import io.quarkus.cache.CacheInvalidateAll;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.UriInfo;
@@ -181,6 +182,10 @@ public class ResourceAuthorizationService {
 
         authGroupManagement.createNewRole(request);
 
+    }
+
+    public void deleteRole(String id){
+        authGroupManagement.deleteRole(id);
     }
 
     private InformativeResponse defaultLogic(AssignRoleRequest request){
