@@ -75,4 +75,14 @@ public interface RoleManagement {
      *         or an empty list if no roles are defined
      */
     List<RoleResponse> getAllRoles();
+
+    /**
+     * Deletes an existing role from the role management system.
+     *
+     * <p>Removes the role and its associated group hierarchy,
+     * including resource-specific groups and memberships.
+     *
+     * @param roleId the unique identifier of the role to delete
+     */
+    void deleteRole(String roleId);
 }
