@@ -183,6 +183,11 @@ public class OidcResourceAuthorizationService implements ResourceAuthorizationSe
 
     }
 
+    @CacheInvalidateAll(cacheName = "agm-groups")
+    public void deleteRole(String roleId) {
+        authGroupManagement.deleteRole(roleId);
+    }
+
     private InformativeResponse defaultLogic(AssignRoleRequest request){
 
         var response = new InformativeResponse();

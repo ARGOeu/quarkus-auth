@@ -26,9 +26,11 @@ import org.grnet.endpoint.scanner.runtime.ParamRef;
 import org.grnet.endpoint.scanner.runtime.ParamType;
 import org.grnet.endpoint.scanner.runtime.SecuredEndpoint;
 import org.grnet.endpoint.scanner.runtime.dtos.*;
+import org.grnet.endpoint.scanner.runtime.services.OidcResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.services.ResourceAuthorizationService;
 import org.grnet.endpoint.scanner.runtime.services.RoleEndpointService;
 import org.grnet.endpoint.scanner.runtime.validators.constraints.ValidRole;
+import org.grnet.endpoint.scanner.runtime.entitlements.qualifiers.ExternalSystemAuthorization;
 
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,53 @@ public class RoleEndpoint {
         response.message = "Role created successfully.";
 
         return Response.ok().entity(response).build();
+    }
+
+    @Tag(name = "Quarkus Auth")
+    @Operation(
+            summary = "Delete a  role.",
+            description = "Delete a role"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Role deleted successfully.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @DELETE
+    @Path("/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+    public Response deleteRole(
+            @PathParam("id")
+            @Valid @ValidRole String id) {
+
+        resourceAuthorizationService.deleteRole(id);
+        roleEndpointService.deleteRoleEndpointAssignments(id);
+
+        var response = new InformativeResponse();
+        response.code = 200;
+        response.message = "Role deleted successfully.";
+
+        return Response.ok(response).build();
     }
 
     @Tag(name = "Quarkus Auth")

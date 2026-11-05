@@ -1,6 +1,8 @@
 package org.grnet.endpoint.scanner.runtime.clients.groupmanagement;
 
 import io.quarkus.rest.client.reactive.QuarkusRestClientBuilder;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotFoundException;
 import org.grnet.endpoint.scanner.runtime.clients.groupmanagement.response.*;
 import org.grnet.endpoint.scanner.runtime.dtos.CreateRoleRequest;
 import org.grnet.endpoint.scanner.runtime.dtos.RoleResponse;
@@ -182,6 +184,29 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         var parentPath = "/" + parentGroup;
         createGroup(parentPath, request.name, List.of(), request.attributes);
     }
+
+
+    @Override
+    public void deleteRole(String roleId) {
+
+        var role = getAllRoles().stream()
+                .filter(r -> r.id.equals(roleId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new NotFoundException("Role not found: " + roleId));
+
+        if ("members".equals(role.name)) {
+            throw new ForbiddenException(
+                    "The members role cannot be deleted.");
+        }
+
+        var rolePath = "/" + parentGroup + "/" + role.name;
+
+        getGroupClient().deleteGroup(roleId);
+
+        LOG.infof("Role deleted: %s (ID: %s)", rolePath, roleId);
+    }
+
 
     /**
      * Assigns the default "members" role to the specified user,

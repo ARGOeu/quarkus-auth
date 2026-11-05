@@ -82,6 +82,11 @@ public class ResourceAuthorizationServiceWithPersistence implements ResourceAuth
     }
 
     @Override
+    public void deleteRole(String roleId) {
+        resolve().deleteRole(roleId);
+    }
+
+    @Override
     public UserProfileDto getUserProfile() {
         return resolve().getUserProfile();
     }
