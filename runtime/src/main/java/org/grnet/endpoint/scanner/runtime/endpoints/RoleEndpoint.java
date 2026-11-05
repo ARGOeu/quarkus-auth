@@ -95,6 +95,51 @@ public class RoleEndpoint {
 
     @Tag(name = "Quarkus Auth")
     @Operation(
+            summary = "Delete a  role.",
+            description = "Delete a role"
+    )
+    @APIResponse(
+            responseCode = "200",
+            description = "Role deleted successfully.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = InformativeResponse.class)))
+    @APIResponse(
+            responseCode = "401",
+            description = "User has not been authenticated.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "403",
+            description = "Not permitted.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @APIResponse(
+            responseCode = "500",
+            description = "Internal Server Error.",
+            content = @Content(schema = @Schema(
+                    type = SchemaType.OBJECT,
+                    implementation = Object.class)))
+    @DELETE
+    @Produces(MediaType.APPLICATION_JSON)
+    @SecuredEndpoint
+    @Path("/{id}")
+    public Response deleteRole(
+            @PathParam("id") @Valid @ValidRole String id) {
+
+        resourceAuthorizationService.deleteRole(id);
+
+        var response = new InformativeResponse();
+        response.code = 200;
+        response.message = "Role deleted successfully.";
+
+        return Response.ok(response).build();
+    }
+
+    @Tag(name = "Quarkus Auth")
+    @Operation(
             summary = "Update role attributes.",
             description = "Updates the attributes of an existing role."
     )
