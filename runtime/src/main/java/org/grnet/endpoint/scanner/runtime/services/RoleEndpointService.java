@@ -194,8 +194,10 @@ public class RoleEndpointService {
 
             Set<String> incoming = new HashSet<>(assignment.getSecuredEndpointIds());
 
+//            List<RoleEndpoint> roleEntries =
+//                    roleEndpointRepository.list("role_id", roleId);
             List<RoleEndpoint> roleEntries =
-                    roleEndpointRepository.list("role_id", roleId);
+                    roleEndpointRepository.list("roleId", roleId);
 
             Set<String> existingEndpoints = roleEntries.stream()
                     .map(RoleEndpoint::getSecuredEndpointId)
@@ -240,18 +242,29 @@ public class RoleEndpointService {
                 roleEndpointRepository.list("role_id", roleId);
 
         // key = endpointId:scope
+//        Map<String, RoleEndpoint> existingMap =
+//                existing.stream()
+//                        .collect(Collectors.toMap(
+//                                e -> e.getSecuredEndpointId()
+//                                        + ":" +
+//                                        (e.getScope() != null
+//                                                ? e.getScope().toLowerCase()
+//                                                : ""),
+//                                e -> e,
+//                                (a, b) -> a
+//                        ));
+
         Map<String, RoleEndpoint> existingMap =
                 existing.stream()
                         .collect(Collectors.toMap(
                                 e -> e.getSecuredEndpointId()
                                         + ":" +
                                         (e.getScope() != null
-                                                ? e.getScope().toLowerCase()
+                                                ? e.getScope().toUpperCase()
                                                 : ""),
                                 e -> e,
                                 (a, b) -> a
                         ));
-
         // incoming unique keys
         Set<String> incomingKeys =
                 request.getAssignments().stream()
