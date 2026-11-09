@@ -344,7 +344,7 @@ public class RoleEndpoint {
                                               example = "c242e43f-9869-4fb0-b881-631bc5746ec0",
                                               schema = @Schema(type = SchemaType.STRING)) @PathParam("id")
                                       @Valid @ValidRole String id,
-                                      SecuredEndpointPerRoleRequest request) throws io.undertow.util.BadRequestException {
+                                      SecuredEndpointPerRoleRequest request) {
 
         roleEndpointService.assignRolesToEndpointsPerRole(id,request);
         var informativeResponse = new InformativeResponse();
