@@ -183,6 +183,25 @@ public class AuthGroupManagement implements GroupManagement, RoleManagement {
         createGroup(parentPath, request.name, List.of(), request.attributes);
     }
 
+
+    @Override
+    public void deleteRole(String roleId) {
+
+        var role = getAllRoles().stream()
+                .filter(r -> r.id.equals(roleId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new jakarta.ws.rs.NotFoundException(
+                                "Role not found: " + roleId));
+
+        var rolePath = "/" + parentGroup + "/" + role.name;
+
+        getGroupClient().deleteGroup(roleId);
+
+        LOG.infof("Role deleted: %s (ID: %s)", rolePath, roleId);
+    }
+
+
     /**
      * Assigns the default "members" role to the specified user,
      * effectively adding them to the members group in the Group Management system.
