@@ -104,6 +104,11 @@ public class PersistenceEntitlementJDBCRepository implements PersistenceEntitlem
     }
 
     @Override
+    public void deleteActorEntitlementsByEntitlementId(String entitlementId) {
+        throw new RuntimeException("Entitlement persistence is not supported for relational databases.");
+    }
+
+    @Override
     public long countAllActorByEntitlementId(String entitlementId) {
         throw new RuntimeException("Entitlement persistence is not supported for relational databases.");
     }

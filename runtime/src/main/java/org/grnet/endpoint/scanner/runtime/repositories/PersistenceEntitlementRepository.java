@@ -48,6 +48,8 @@ public interface PersistenceEntitlementRepository {
 
     void deleteActorEntitlementByEntitlementAndActor(String entitlementId, String actorId);
 
+    void deleteActorEntitlementsByEntitlementId(String entitlementId);
+
     List<Actor> findAllActorsByEntitlementId(String entitlementId, int page, int size);
 
     long countAllActorByEntitlementId(String entitlementId);

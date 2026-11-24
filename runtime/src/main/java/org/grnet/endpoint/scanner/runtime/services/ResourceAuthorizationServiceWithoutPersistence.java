@@ -63,6 +63,10 @@ public class ResourceAuthorizationServiceWithoutPersistence implements ResourceA
     }
 
     @Override
+    public void deleteRole(String roleId) {
+        externalSystemService.deleteRole(roleId);
+    }
+    @Override
     public UserProfileDto getUserProfile() {
         return externalSystemService.getUserProfile();
     }

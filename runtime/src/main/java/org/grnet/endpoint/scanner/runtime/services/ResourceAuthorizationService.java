@@ -35,6 +35,7 @@ public interface ResourceAuthorizationService {
     InformativeResponse revokeRoleFromUser(RevokeRoleRequest request);
     void createNewRole(CreateRoleRequest request);
 
+    void deleteRole(String roleId);
     UserProfileDto getUserProfile();
     void assignUserTheMemberRole();
     void updateRoleAttributes(String role, Map<String, List<String>> attributes);

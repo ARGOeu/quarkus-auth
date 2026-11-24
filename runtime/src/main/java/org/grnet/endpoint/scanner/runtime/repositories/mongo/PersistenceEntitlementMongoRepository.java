@@ -258,6 +258,13 @@ public class PersistenceEntitlementMongoRepository implements PersistenceEntitle
     }
 
     @Override
+    public void deleteActorEntitlementsByEntitlementId(String entitlementId) {
+
+        getCollectionByClass(ActorEntitlements.class)
+                .deleteMany(eq("entitlement_id", entitlementId));
+    }
+
+    @Override
     public List<Actor> findAllActorsByEntitlementId(String entitlementId, int page, int size) {
 
 

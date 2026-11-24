@@ -310,6 +310,48 @@ public class PersistenceResourceAuthorizationService implements ResourceAuthoriz
     }
 
     @Override
+    public void deleteRole(String roleId) {
+
+        var role = getAllRoles().stream()
+                .filter(r -> r.id.equals(roleId))
+                .findFirst()
+                .orElseThrow(() ->
+                        new NotFoundException("Role not found: " + roleId));
+
+        var roleName = buildRoleUrn(
+                userContextInterface.getNamespace(),
+                userContextInterface.getParent(),
+                role.name
+        );
+
+        persistenceEntitlementRepository.findByIdOptional(roleId, org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement.class)
+                .filter(e -> roleName.equals(e.getName()))
+                .orElseThrow(() ->
+                        new NotFoundException("Role not found: " + roleId));
+
+        if ("members".equals(role.name)) {
+            throw new ForbiddenException("The members role cannot be deleted.");
+        }
+
+        var entitlements = persistenceEntitlementRepository.fetchAll(org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement.class);
+
+        var rolePrefix = roleName.substring(0, roleName.length() - ":role=member".length());
+
+        var rolesToDelete = entitlements.stream()
+                .filter(e -> e.getName() != null)
+                .filter(e -> e.getName().equals(roleName)
+                        || (e.getName().startsWith(rolePrefix + ":")
+                        && e.getName().endsWith(":role=member")))
+                .toList();
+
+        for (var roleToDelete : rolesToDelete) {
+
+            persistenceEntitlementRepository.deleteActorEntitlementsByEntitlementId(roleToDelete.getId());
+            persistenceEntitlementRepository.deleteById(roleToDelete.getId(), org.grnet.endpoint.scanner.runtime.entities.entitlements.persistence.Entitlement.class);
+        }
+    }
+
+    @Override
     public UserProfileDto getUserProfile() {
 
         var opt = persistenceEntitlementRepository.findActorByOidcIdAndIssuer(userContextInterface.getId(), userContextInterface.getIssuer());
