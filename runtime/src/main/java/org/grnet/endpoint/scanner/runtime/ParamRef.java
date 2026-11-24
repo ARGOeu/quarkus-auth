@@ -14,6 +14,8 @@ public @interface ParamRef {
 
     Class<? extends ApiResource> referTo() default NoResource.class;
     String referToField() default "";
+    Class<? extends ApiResource>[] alsoReferTo() default {};
+
 
 }
 
