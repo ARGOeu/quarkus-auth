@@ -22,6 +22,15 @@ According to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) , the `Unr
 
 
 ## Unreleased
+
+## Unreleased
+---
+
+### Added
+-[#85](https://github.com/ARGOeu/quarkus-auth/pull/85) ARGO-6072 [QUARKUS-AUTH] - Add logs to check access mechanism
+
+### Fixed
+
 ---
 
 ## 1.0.1 - 2025-06-25
