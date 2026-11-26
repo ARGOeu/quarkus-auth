@@ -92,11 +92,11 @@ public class SecuredEndpointInterceptor {
     public Object checkAccess(InvocationContext context) throws Exception {
         Method method = context.getMethod();
         String endpoint = method.getDeclaringClass().getSimpleName() + "#" + method.getName();
-        LOG.debugf("[AUTH] Starting authorization for %s", endpoint);
+        LOG.infof("[AUTH] Starting authorization for %s", endpoint);
 
         // Super administrators bypass endpoint authorization checks.
         if (entitlementProvider.isSuperAdmin()) {
-            LOG.debugf("[AUTH] Super administrator bypass for %s", endpoint);
+            LOG.infof("[AUTH] Super administrator bypass for %s", endpoint);
             return context.proceed();
         }
 
@@ -107,15 +107,15 @@ public class SecuredEndpointInterceptor {
         }
 
         List<String> entitlements = extractEntitlements();
-        LOG.debugf("[AUTH] Extracted %d normalized entitlements", entitlements.size());
+        LOG.infof("[AUTH] Extracted %d normalized entitlements", entitlements.size());
 
         String httpMethod = getHttpMethod(method);
         String fullPath = buildFullPath(context, method);
         String securedEndpointId = generateSecuredEndpointId(httpMethod, fullPath);
-        LOG.debugf("[AUTH] Endpoint: %s %s; secured endpoint ID: %s", httpMethod, fullPath, securedEndpointId);
+        LOG.infof("[AUTH] Endpoint: %s %s; secured endpoint ID: %s", httpMethod, fullPath, securedEndpointId);
 
         List<RoleEndpoint> roleEndpoints = roleEndpointRepository.list("secured_endpoint_id", securedEndpointId);
-        LOG.debugf("[AUTH] Found %d configured role mappings for endpoint", roleEndpoints.size());
+        LOG.infof("[AUTH] Found %d configured role mappings for endpoint", roleEndpoints.size());
         if (roleEndpoints.isEmpty()) {
             LOG.warnf("[AUTH] No role mappings found for endpoint ID %s", securedEndpointId);
         }
@@ -131,7 +131,7 @@ public class SecuredEndpointInterceptor {
             throw new ForbiddenException("Access denied.");
         }
 
-        LOG.debugf("[AUTH] ACCESS GRANTED for %s (%s %s)", endpoint, httpMethod, fullPath);
+        LOG.infof("[AUTH] ACCESS GRANTED for %s (%s %s)", endpoint, httpMethod, fullPath);
         return context.proceed();
     }
 
@@ -163,7 +163,7 @@ public class SecuredEndpointInterceptor {
                 })
                 .toList();
 
-        LOG.debugf("[AUTH] Normalized entitlements (count=%d)", normalized.size());
+        LOG.infof("[AUTH] Normalized entitlements (count=%d)", normalized.size());
         if (LOG.isTraceEnabled()) {
             LOG.tracef("[AUTH] Normalized entitlement values: %s", normalized);
         }
@@ -200,17 +200,17 @@ public class SecuredEndpointInterceptor {
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
 
-        LOG.debugf("[AUTH] Evaluating access: %d role mappings, %d resource requirements",
+        LOG.infof("[AUTH] Evaluating access: %d role mappings, %d resource requirements",
                 roleEndpoints.size(), acceptedAccess.size());
-        LOG.debugf("[AUTH] Required resource access: %s", acceptedAccess);
+        LOG.infof("[AUTH] Required resource access: %s", acceptedAccess);
 
         for (RoleEndpoint entry : roleEndpoints) {
             String roleName = entry.getRoleName().toUpperCase();
-            LOG.debugf("[AUTH] Checking configured role: %s", roleName);
+            LOG.infof("[AUTH] Checking configured role: %s", roleName);
 
             // Role-only authorization.
             if (normalizedEntitlements.contains(roleName)) {
-                LOG.debugf("[AUTH] GRANTED by role-only entitlement: %s", roleName);
+                LOG.infof("[AUTH] GRANTED by role-only entitlement: %s", roleName);
                 return true;
             }
 
@@ -218,7 +218,7 @@ public class SecuredEndpointInterceptor {
                 boolean roleMatch = normalizedEntitlements.stream()
                         .anyMatch(entitlement -> entitlement.equals(roleName)
                                 || entitlement.startsWith(roleName + ":"));
-                LOG.debugf("[AUTH] Role-only entitlement-prefix match for %s: %s", roleName, roleMatch);
+                LOG.infof("[AUTH] Role-only entitlement-prefix match for %s: %s", roleName, roleMatch);
                 if (roleMatch) return true;
                 continue;
             }
@@ -227,11 +227,11 @@ public class SecuredEndpointInterceptor {
             for (String access : acceptedAccess) {
                 String normalizedAccess = access.toUpperCase();
                 String requiredEntitlement = roleName + ":" + normalizedAccess;
-                LOG.debugf("[AUTH] Checking required entitlement: %s", requiredEntitlement);
+                LOG.infof("[AUTH] Checking required entitlement: %s", requiredEntitlement);
 
                 // Direct resource authorization.
                 if (normalizedEntitlements.contains(requiredEntitlement)) {
-                    LOG.debugf("[AUTH] GRANTED by direct resource entitlement: %s", requiredEntitlement);
+                    LOG.infof("[AUTH] GRANTED by direct resource entitlement: %s", requiredEntitlement);
                     return true;
                 }
 
@@ -239,13 +239,13 @@ public class SecuredEndpointInterceptor {
                 if (!normalizedAccess.contains(":")) {
                     boolean hasCollectionAccess = normalizedEntitlements.stream()
                             .anyMatch(entitlement -> entitlement.startsWith(requiredEntitlement + ":"));
-                    LOG.debugf("[AUTH] Collection-level match for %s: %s", requiredEntitlement, hasCollectionAccess);
+                    LOG.infof("[AUTH] Collection-level match for %s: %s", requiredEntitlement, hasCollectionAccess);
                     if (hasCollectionAccess) return true;
                 }
 
                 // Related resource authorization.
                 if (hasRelatedResourceAccess(roleName, normalizedEntitlements, acceptedAccess, normalizedAccess)) {
-                    LOG.debugf("[AUTH] GRANTED through related resource for %s", normalizedAccess);
+                    LOG.infof("[AUTH] GRANTED through related resource for %s", normalizedAccess);
                     return true;
                 }
             }
@@ -285,26 +285,26 @@ public class SecuredEndpointInterceptor {
                                              List<String> allAcceptedAccess, String targetAccess) {
         String[] targetParts = targetAccess.toUpperCase().split(":", 2);
         if (targetParts.length != 2) {
-            LOG.debugf("[AUTH] Related-resource check skipped; target is not a specific resource: %s", targetAccess);
+            LOG.infof("[AUTH] Related-resource check skipped; target is not a specific resource: %s", targetAccess);
             return false;
         }
 
         String targetResourceName = targetParts[0];
         String targetResourceId = targetParts[1];
-        LOG.debugf("[AUTH] Looking for related-resource access to %s:%s", targetResourceName, targetResourceId);
+        LOG.infof("[AUTH] Looking for related-resource access to %s:%s", targetResourceName, targetResourceId);
 
         for (ResourceRelationshipResolver resolver : relationshipResolvers) {
             if (!resolver.getTargetResourceName().equalsIgnoreCase(targetResourceName)) continue;
 
             String sourceResourceName = resolver.getSourceResourceName().toUpperCase();
-            LOG.debugf("[AUTH] Applicable relationship resolver: %s -> %s", sourceResourceName, targetResourceName);
+            LOG.infof("[AUTH] Applicable relationship resolver: %s -> %s", sourceResourceName, targetResourceName);
 
             // Do not use a relationship to authorize a different explicitly requested source resource.
             boolean specificSourceRequested = allAcceptedAccess.stream()
                     .map(String::toUpperCase)
                     .anyMatch(access -> access.startsWith(sourceResourceName + ":"));
             if (specificSourceRequested) {
-                LOG.debugf("[AUTH] Related-resource check skipped; source %s is explicitly requested", sourceResourceName);
+                LOG.infof("[AUTH] Related-resource check skipped; source %s is explicitly requested", sourceResourceName);
                 continue;
             }
 
@@ -315,17 +315,17 @@ public class SecuredEndpointInterceptor {
                 String sourceResourceId = entitlement.substring(sourceEntitlementPrefix.length());
                 if (sourceResourceId.isBlank()) continue;
 
-                LOG.debugf("[AUTH] Checking relationship %s:%s -> %s:%s",
+                LOG.infof("[AUTH] Checking relationship %s:%s -> %s:%s",
                         sourceResourceName, sourceResourceId, targetResourceName, targetResourceId);
                 if (resolver.isRelatedTo(sourceResourceId, targetResourceId)) {
-                    LOG.debugf("[AUTH] Related-resource match found: %s:%s -> %s:%s",
+                    LOG.infof("[AUTH] Related-resource match found: %s:%s -> %s:%s",
                             sourceResourceName, sourceResourceId, targetResourceName, targetResourceId);
                     return true;
                 }
             }
         }
 
-        LOG.debugf("[AUTH] No related-resource entitlement grants access to %s", targetAccess);
+        LOG.infof("[AUTH] No related-resource entitlement grants access to %s", targetAccess);
         return false;
     }
 
@@ -354,7 +354,7 @@ public class SecuredEndpointInterceptor {
                 .collect(Collectors.groupingBy(ParamRef::type,
                         Collectors.toMap(ParamRef::param, ref -> ref)));
 
-        LOG.debugf("[AUTH] Configured ParamRef groups: %s", refMaps.keySet());
+        LOG.infof("[AUTH] Configured ParamRef groups: %s", refMaps.keySet());
         List<String> acceptedAccess = new ArrayList<>();
 
         if (refMaps.containsKey(ParamType.PATH)) processParams(params.path, refMaps.get(ParamType.PATH), acceptedAccess);
@@ -362,7 +362,7 @@ public class SecuredEndpointInterceptor {
         if (refMaps.containsKey(ParamType.HEADER)) processParams(params.header, refMaps.get(ParamType.HEADER), acceptedAccess);
         if (refMaps.containsKey(ParamType.BODY)) processParams(extractBody(params.body), refMaps.get(ParamType.BODY), acceptedAccess);
 
-        LOG.debugf("[AUTH] Extracted accepted resource access: %s", acceptedAccess);
+        LOG.infof("[AUTH] Extracted accepted resource access: %s", acceptedAccess);
         return acceptedAccess;
     }
 
@@ -387,7 +387,7 @@ public class SecuredEndpointInterceptor {
      */
     private void processParams(Map<String, Object> values, Map<String, ParamRef> refMap,
                                List<String> acceptedAccess) {
-        LOG.debugf("[AUTH] Processing parameter names: %s", values.keySet());
+        LOG.infof("[AUTH] Processing parameter names: %s", values.keySet());
         for (var entry : values.entrySet()) {
             ParamRef ref = refMap.get(entry.getKey());
             if (ref == null) {
@@ -395,11 +395,11 @@ public class SecuredEndpointInterceptor {
                 continue;
             }
 
-            LOG.debugf("[AUTH] Applying ParamRef for '%s' (type=%s)", entry.getKey(), ref.type());
+            LOG.infof("[AUTH] Applying ParamRef for '%s' (type=%s)", entry.getKey(), ref.type());
             Class<? extends ApiResource> resource;
             if (!ref.referToField().isBlank()) {
                 Object dynamicResourceValue = values.get(ref.referToField());
-                LOG.debugf("[AUTH] Dynamic resource field '%s' resolved to '%s'",
+                LOG.infof("[AUTH] Dynamic resource field '%s' resolved to '%s'",
                         ref.referToField(), dynamicResourceValue);
                 if (dynamicResourceValue == null) {
                     LOG.errorf("[AUTH] Missing referToField value: %s", ref.referToField());
@@ -413,11 +413,11 @@ public class SecuredEndpointInterceptor {
             if (resource != null && resource != NoResource.class) {
                 addAcceptedAccess(resource, entry.getValue().toString(), acceptedAccess);
             } else {
-                LOG.debugf("[AUTH] No primary resource added for parameter '%s'", entry.getKey());
+                LOG.infof("[AUTH] No primary resource added for parameter '%s'", entry.getKey());
             }
 
             for (Class<? extends ApiResource> additionalResource : ref.alsoReferTo()) {
-                LOG.debugf("[AUTH] Adding alsoReferTo collection resource: %s", additionalResource.getSimpleName());
+                LOG.infof("[AUTH] Adding alsoReferTo collection resource: %s", additionalResource.getSimpleName());
                 addAcceptedAccess(additionalResource, null, acceptedAccess);
             }
         }
@@ -449,7 +449,7 @@ public class SecuredEndpointInterceptor {
         String resourceType = enumClass.getEnumConstants()[0].name();
         String access = resourceId == null ? resourceType : resourceType + ":" + resourceId;
         acceptedAccess.add(access);
-        LOG.debugf("[AUTH] Added accepted access requirement: %s", access);
+        LOG.infof("[AUTH] Added accepted access requirement: %s", access);
     }
 
     /**
@@ -465,7 +465,7 @@ public class SecuredEndpointInterceptor {
      */
     @SuppressWarnings("unchecked")
     private Class<? extends ApiResource> resolveResource(String apiResource) {
-        LOG.debugf("[AUTH] Resolving API resource name: %s", apiResource);
+        LOG.infof("[AUTH] Resolving API resource name: %s", apiResource);
         var metadata = apiResourceHolder.getResources().stream()
                 .filter(r -> r.getResourceName().equalsIgnoreCase(apiResource))
                 .findFirst()
@@ -476,7 +476,7 @@ public class SecuredEndpointInterceptor {
 
         try {
             Class<?> clazz = Thread.currentThread().getContextClassLoader().loadClass(metadata.getClassName());
-            LOG.debugf("[AUTH] Resolved resource '%s' to class %s", apiResource, clazz.getName());
+            LOG.infof("[AUTH] Resolved resource '%s' to class %s", apiResource, clazz.getName());
             return (Class<? extends ApiResource>) clazz;
         } catch (ClassNotFoundException e) {
             LOG.errorf(e, "[AUTH] Cannot load resource class: %s", metadata.getClassName());
@@ -516,7 +516,7 @@ public class SecuredEndpointInterceptor {
     private Map<String, Object> extractBody(Object body) {
         Map<String, Object> result = new HashMap<>();
         extract(body, result);
-        LOG.debugf("[AUTH] Extracted body field names: %s", result.keySet());
+        LOG.infof("[AUTH] Extracted body field names: %s", result.keySet());
         return result;
     }
 
@@ -567,19 +567,19 @@ public class SecuredEndpointInterceptor {
             if (p.isAnnotationPresent(PathParam.class)) {
                 String name = p.getAnnotation(PathParam.class).value();
                 result.path.put(name, value);
-                LOG.debugf("[AUTH] Found PATH parameter '%s'", name);
+                LOG.infof("[AUTH] Found PATH parameter '%s'", name);
                 continue;
             }
             if (p.isAnnotationPresent(QueryParam.class)) {
                 String name = p.getAnnotation(QueryParam.class).value();
                 result.query.put(name, value);
-                LOG.debugf("[AUTH] Found QUERY parameter '%s'", name);
+                LOG.infof("[AUTH] Found QUERY parameter '%s'", name);
                 continue;
             }
             if (p.isAnnotationPresent(HeaderParam.class)) {
                 String name = p.getAnnotation(HeaderParam.class).value();
                 result.header.put(name, value);
-                LOG.debugf("[AUTH] Found HEADER parameter '%s'", name);
+                LOG.infof("[AUTH] Found HEADER parameter '%s'", name);
                 continue;
             }
             if (p.isAnnotationPresent(Context.class)
@@ -591,10 +591,10 @@ public class SecuredEndpointInterceptor {
             }
 
             result.body.add(value);
-            LOG.debugf("[AUTH] Found BODY parameter '%s'", p.getName());
+            LOG.infof("[AUTH] Found BODY parameter '%s'", p.getName());
         }
 
-        LOG.debugf("[AUTH] Request parameter extraction complete: PATH=%s, QUERY=%s, HEADER=%s, BODY count=%d",
+        LOG.infof("[AUTH] Request parameter extraction complete: PATH=%s, QUERY=%s, HEADER=%s, BODY count=%d",
                 result.path.keySet(), result.query.keySet(), result.header.keySet(), result.body.size());
         return result;
     }
@@ -620,7 +620,7 @@ public class SecuredEndpointInterceptor {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest((httpMethod + fullPath).getBytes(StandardCharsets.UTF_8));
             String id = HexFormat.of().formatHex(hash);
-            LOG.debugf("[AUTH] Generated secured endpoint ID for %s %s: %s", httpMethod, fullPath, id);
+            LOG.infof("[AUTH] Generated secured endpoint ID for %s %s: %s", httpMethod, fullPath, id);
             return id;
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
@@ -672,7 +672,7 @@ public class SecuredEndpointInterceptor {
         if (methodPath != null) full += methodPath.value();
 
         String normalized = normalizePath(full);
-        LOG.debugf("[AUTH] Built endpoint path: %s", normalized);
+        LOG.infof("[AUTH] Built endpoint path: %s", normalized);
         return normalized;
     }
 
